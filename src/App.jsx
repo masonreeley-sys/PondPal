@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import { supabase } from "./supabase";
+import venmoQr from "./assets/venmo-qr.png";
 
 const LAKE_CHARLESTON = { lat: 39.4666, lng: -88.1458 };
 const MILES_TO_METERS = 1609.34;
@@ -1152,7 +1153,7 @@ export default function App() {
 
           <div style={styles.qrWrap}>
             <img
-              src="/venmo-qr.png"
+              src={venmoQr}
               alt="Donate to PondPal with Venmo"
               style={styles.qrCode}
             />
@@ -1483,7 +1484,7 @@ const styles = {
   qrCode: {
     width: "150px",
     height: "150px",
-    objectFit: "cover",
+    objectFit: "contain",
     borderRadius: "16px",
     border: "1px solid #dbeafe",
     background: "white",
