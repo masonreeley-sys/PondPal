@@ -1,11 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import {
-  MapContainer,
-  TileLayer,
-  CircleMarker,
-  Popup,
-  useMap,
-} from "react-leaflet";
+import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import { supabase } from "./supabase";
 
@@ -13,56 +7,31 @@ const LAKE_CHARLESTON = { lat: 39.4666, lng: -88.1458 };
 const MILES_TO_METERS = 1609.34;
 
 const FALLBACK_WATERS = [
-  {
-    id: "fallback-lake-charleston",
-    name: "Lake Charleston",
-    type: "lake",
-    lat: 39.4666,
-    lng: -88.1458,
-  },
-  {
-    id: "fallback-lake-mattoon",
-    name: "Lake Mattoon",
-    type: "lake",
-    lat: 39.317,
-    lng: -88.453,
-  },
-  {
-    id: "fallback-walnut-point-lake",
-    name: "Walnut Point Lake",
-    type: "lake",
-    lat: 39.646,
-    lng: -88.057,
-  },
-  {
-    id: "fallback-lake-paradise",
-    name: "Lake Paradise",
-    type: "lake",
-    lat: 39.42,
-    lng: -88.39,
-  },
-  {
-    id: "fallback-mill-creek-lake",
-    name: "Mill Creek Lake",
-    type: "lake",
-    lat: 39.392,
-    lng: -87.666,
-  },
+  { id: "fallback-lake-charleston", name: "Lake Charleston", type: "lake", lat: 39.4666, lng: -88.1458 },
+  { id: "fallback-lake-mattoon", name: "Lake Mattoon", type: "lake", lat: 39.317, lng: -88.453 },
+  { id: "fallback-walnut-point", name: "Walnut Point Lake", type: "lake", lat: 39.646, lng: -88.057 },
+  { id: "fallback-lake-paradise", name: "Lake Paradise", type: "lake", lat: 39.42, lng: -88.39 },
+  { id: "fallback-mill-creek", name: "Mill Creek Lake", type: "lake", lat: 39.392, lng: -87.666 },
 ];
+
+function getLevelFromXP(xp) {
+  return Math.max(1, Math.floor((Number(xp) || 0) / 100) + 1);
+}
+
+function getXPForNextLevel(xp) {
+  const currentXP = Number(xp) || 0;
+  const nextLevelXP = getLevelFromXP(currentXP) * 100;
+  return Math.max(0, nextLevelXP - currentXP);
+}
 
 export default function App() {
   const [session, setSession] = useState(null);
   const [authMode, setAuthMode] = useState("login");
-  const [authForm, setAuthForm] = useState({
-    name: "",
-    email: "",
-    password: "",
-  });
+  const [authForm, setAuthForm] = useState({ name: "", email: "", password: "" });
   const [authError, setAuthError] = useState("");
+
   const [tab, setTab] = useState("dashboard");
-  const [darkMode, setDarkMode] = useState(() =>
-    JSON.parse(localStorage.getItem("pondpal-dark") || "false")
-  );
+  const [darkMode, setDarkMode] = useState(() => JSON.parse(localStorage.getItem("pondpal-dark") || "false"));
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   const [ponds, setPonds] = useState([]);
@@ -81,8 +50,10 @@ export default function App() {
 
   const [notes, setNotes] = useState([]);
   const [note, setNote] = useState("");
+
   const [pondSize, setPondSize] = useState(0.25);
   const [goal, setGoal] = useState("balanced");
+
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
   const [aiHistory, setAiHistory] = useState([]);
@@ -94,9 +65,14 @@ export default function App() {
 
   const theme = darkMode ? dark : light;
   const user = session?.user;
+
   const selectedPond = ponds.find((p) => p.id === selectedPondId);
   const pondCatches = catches.filter((fish) => fish.pond_id === selectedPondId);
   const pondNotes = notes.filter((item) => item.pond_id === selectedPondId);
+
+  const isPersonalPond = selectedPond?.is_personal !== false;
+  const currentXP = selectedPond?.xp || 0;
+  const currentLevel = selectedPond?.level || getLevelFromXP(currentXP);
 
   useEffect(() => {
     function handleResize() {
@@ -110,9 +86,9 @@ export default function App() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
 
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      (_event, newSession) => setSession(newSession)
-    );
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession);
+    });
 
     return () => listener.subscription.unsubscribe();
   }, []);
@@ -144,6 +120,9 @@ export default function App() {
           user_id: user.id,
           name: "Main Pond",
           location: "Home",
+          is_personal: true,
+          xp: 0,
+          level: 1,
         })
         .select()
         .single();
@@ -192,32 +171,25 @@ export default function App() {
       ];
 
       let data = null;
-      let lastError = null;
 
       for (const endpoint of endpoints) {
         try {
           const response = await fetch(endpoint, {
             method: "POST",
-            headers: {
-              "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-            },
+            headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
             body: new URLSearchParams({ data: query }),
           });
 
-          if (!response.ok) {
-            throw new Error(`Overpass server error: ${response.status}`);
-          }
+          if (!response.ok) continue;
 
           data = await response.json();
           break;
-        } catch (err) {
-          lastError = err;
+        } catch {
+          continue;
         }
       }
 
-      if (!data) {
-        throw lastError || new Error("Map search failed.");
-      }
+      if (!data) throw new Error("Map search failed.");
 
       const waters = data.elements
         .filter((item) => item.tags?.name)
@@ -230,28 +202,57 @@ export default function App() {
         }))
         .filter((item) => item.lat && item.lng);
 
-      const unique = Array.from(
-        new Map(waters.map((w) => [w.name + w.lat + w.lng, w])).values()
-      );
+      const unique = Array.from(new Map(waters.map((w) => [w.name + w.lat + w.lng, w])).values());
 
       if (unique.length === 0) {
         setNearbyWaters(FALLBACK_WATERS);
-        setMapError(
-          "Live lake search found no results, so showing local starter lakes."
-        );
+        setMapError("Live lake search found no results, so showing local starter lakes.");
         return;
       }
 
       setNearbyWaters(unique);
-    } catch (err) {
+    } catch {
       setNearbyWaters(FALLBACK_WATERS);
-      setMapError(
-        "Live lake search failed, so showing local starter lakes instead."
-      );
+      setMapError("Live lake search failed, so showing local starter lakes instead.");
     } finally {
       setMapLoading(false);
     }
   }
+
+  async function updatePondXP(pondId, amount) {
+    const pond = ponds.find((p) => p.id === pondId);
+    if (!pond) return;
+
+    const newXP = (Number(pond.xp) || 0) + amount;
+    const newLevel = getLevelFromXP(newXP);
+
+    const { error } = await supabase
+      .from("ponds")
+      .update({ xp: newXP, level: newLevel })
+      .eq("id", pondId);
+
+    if (!error) {
+      setPonds((oldPonds) =>
+        oldPonds.map((p) =>
+          p.id === pondId ? { ...p, xp: newXP, level: newLevel } : p
+        )
+      );
+    }
+  }
+
+  function calculatePondHealthScore() {
+    if (!selectedPond || selectedPond.is_personal === false) return null;
+
+    let score = 55;
+    score += Math.min(20, pondCatches.length * 4);
+    score += Math.min(10, pondNotes.length * 2);
+    score += Math.min(10, currentLevel * 2);
+    score += selectedPond.location ? 5 : 0;
+
+    return Math.min(100, score);
+  }
+
+  const pondHealthScore = calculatePondHealthScore();
 
   async function handleAuth(e) {
     e.preventDefault();
@@ -273,9 +274,7 @@ export default function App() {
         return;
       }
 
-      alert(
-        "Account created. Check your email if Supabase asks you to confirm it, then log in."
-      );
+      alert("Account created. Check your email if Supabase asks you to confirm it, then log in.");
       setAuthMode("login");
       return;
     }
@@ -307,6 +306,9 @@ export default function App() {
         user_id: user.id,
         name: newPond.name,
         location: newPond.location || "No location added",
+        is_personal: true,
+        xp: 10,
+        level: 1,
       })
       .select()
       .single();
@@ -321,15 +323,12 @@ export default function App() {
   }
 
   async function deletePond(id) {
-    const confirmed = confirm(
-      "Delete this pond? This will also remove its catches and notes."
-    );
+    const confirmed = confirm("Delete this pond? This will also remove its catches and notes.");
     if (!confirmed) return;
 
     await supabase.from("ponds").delete().eq("id", id);
 
     const updatedPonds = ponds.filter((pond) => pond.id !== id);
-
     setPonds(updatedPonds);
     setCatches(catches.filter((fish) => fish.pond_id !== id));
     setNotes(notes.filter((item) => item.pond_id !== id));
@@ -346,6 +345,9 @@ export default function App() {
         user_id: user.id,
         name: water.name,
         location: `${water.type} near Lake Charleston`,
+        is_personal: false,
+        xp: 0,
+        level: 1,
       })
       .select()
       .single();
@@ -383,7 +385,6 @@ export default function App() {
 
   async function addCatch(e) {
     e.preventDefault();
-
     if (!newCatch.species.trim() || !selectedPondId) return;
 
     let photoUrl = "";
@@ -417,6 +418,8 @@ export default function App() {
         caught_at: new Date().toISOString().slice(0, 10),
         photoFile: null,
       });
+
+      await updatePondXP(selectedPondId, 25);
     }
 
     if (error) alert(error.message);
@@ -444,6 +447,7 @@ export default function App() {
     if (!error && data) {
       setNotes([data, ...notes]);
       setNote("");
+      await updatePondXP(selectedPondId, 10);
     }
 
     if (error) alert(error.message);
@@ -462,27 +466,14 @@ export default function App() {
     const catfish = Math.round(acres * 75);
 
     if (goal === "minnows") {
-      return [
-        `${fatheads} lb fathead minnows`,
-        "Add PVC, brush piles, rock, or pallets",
-        "Wait before adding predator fish",
-      ];
+      return [`${fatheads} lb fathead minnows`, "Add PVC, brush piles, rock, or pallets", "Wait before adding predator fish"];
     }
 
     if (goal === "bass") {
-      return [
-        `${bluegill} bluegill/redear mix`,
-        `${fatheads} lb fathead minnows`,
-        `${bass} largemouth bass once forage is ready`,
-      ];
+      return [`${bluegill} bluegill/redear mix`, `${fatheads} lb fathead minnows`, `${bass} largemouth bass once forage is ready`];
     }
 
-    return [
-      `${bluegill} bluegill/redear mix`,
-      `${fatheads} lb fathead minnows`,
-      `${bass} largemouth bass`,
-      `${catfish} channel catfish if wanted`,
-    ];
+    return [`${bluegill} bluegill/redear mix`, `${fatheads} lb fathead minnows`, `${bass} largemouth bass`, `${catfish} channel catfish if wanted`];
   }, [pondSize, goal]);
 
   const personalRecords = useMemo(() => {
@@ -490,13 +481,9 @@ export default function App() {
 
     pondCatches.forEach((fish) => {
       const species = fish.species || "Unknown";
-      const score =
-        (Number(fish.weight) || 0) * 100 + (Number(fish.length) || 0);
-
+      const score = (Number(fish.weight) || 0) * 100 + (Number(fish.length) || 0);
       const old = records[species];
-      const oldScore = old
-        ? (Number(old.weight) || 0) * 100 + (Number(old.length) || 0)
-        : -1;
+      const oldScore = old ? (Number(old.weight) || 0) * 100 + (Number(old.length) || 0) : -1;
 
       if (!old || score > oldScore) {
         records[species] = fish;
@@ -508,11 +495,8 @@ export default function App() {
 
   const leaderboard = useMemo(() => {
     return [...pondCatches].sort((a, b) => {
-      const scoreA =
-        (Number(a.weight) || 0) * 100 + (Number(a.length) || 0);
-      const scoreB =
-        (Number(b.weight) || 0) * 100 + (Number(b.length) || 0);
-
+      const scoreA = (Number(a.weight) || 0) * 100 + (Number(a.length) || 0);
+      const scoreB = (Number(b.weight) || 0) * 100 + (Number(b.length) || 0);
       return scoreB - scoreA;
     });
   }, [pondCatches]);
@@ -520,9 +504,7 @@ export default function App() {
   function askPondPal() {
     if (!question.trim()) return;
 
-    const response = `For ${
-      selectedPond?.name || "this pond"
-    }, start with oxygen, water clarity, cover, and forage fish before adding bigger predator fish.`;
+    const response = `For ${selectedPond?.name || "this pond"}, start with oxygen, water clarity, cover, and forage fish before adding bigger predator fish.`;
 
     const newMessage = {
       id: crypto.randomUUID(),
@@ -552,9 +534,7 @@ export default function App() {
                 style={styles.input}
                 placeholder="Name"
                 value={authForm.name}
-                onChange={(e) =>
-                  setAuthForm({ ...authForm, name: e.target.value })
-                }
+                onChange={(e) => setAuthForm({ ...authForm, name: e.target.value })}
               />
             )}
 
@@ -562,9 +542,7 @@ export default function App() {
               style={styles.input}
               placeholder="Email"
               value={authForm.email}
-              onChange={(e) =>
-                setAuthForm({ ...authForm, email: e.target.value })
-              }
+              onChange={(e) => setAuthForm({ ...authForm, email: e.target.value })}
             />
 
             <input
@@ -572,9 +550,7 @@ export default function App() {
               placeholder="Password"
               type="password"
               value={authForm.password}
-              onChange={(e) =>
-                setAuthForm({ ...authForm, password: e.target.value })
-              }
+              onChange={(e) => setAuthForm({ ...authForm, password: e.target.value })}
             />
 
             {authError && <p style={styles.error}>{authError}</p>}
@@ -586,13 +562,9 @@ export default function App() {
 
           <button
             style={styles.linkButton}
-            onClick={() =>
-              setAuthMode(authMode === "login" ? "create" : "login")
-            }
+            onClick={() => setAuthMode(authMode === "login" ? "create" : "login")}
           >
-            {authMode === "login"
-              ? "Need an account? Create one"
-              : "Already have an account? Log in"}
+            {authMode === "login" ? "Need an account? Create one" : "Already have an account? Log in"}
           </button>
         </div>
       </div>
@@ -682,13 +654,7 @@ export default function App() {
           )}
         </div>
 
-        <div
-          style={{
-            display: "grid",
-            gap: "10px",
-            marginTop: isMobile ? "14px" : 0,
-          }}
-        >
+        <div style={{ display: "grid", gap: "10px", marginTop: isMobile ? "14px" : 0 }}>
           <button
             style={{
               ...styles.modeButton,
@@ -712,8 +678,7 @@ export default function App() {
           <div>
             <h2 style={styles.pageTitle}>{getTitle(tab)}</h2>
             <p style={{ ...styles.subtitle, color: theme.muted }}>
-              {selectedPond?.name || "No pond"} •{" "}
-              {selectedPond?.location || "Add a pond"}
+              {selectedPond?.name || "No pond"} • {selectedPond?.location || "Add a pond"}
             </p>
           </div>
         </header>
@@ -722,29 +687,53 @@ export default function App() {
           <>
             <section style={styles.hero}>
               <div>
+                <p style={styles.badge}>
+                  {isPersonalPond ? "Personal Pond" : "Named Public Location"}
+                </p>
+
                 <h2 style={styles.heroTitle}>
                   {selectedPond?.name || "Your Pond"} is ready.
                 </h2>
+
                 <p style={styles.heroText}>
-                  Track catches, upload fish photos, compare records, and find
-                  lakes near Lake Charleston.
+                  Track catches, upload fish photos, gain XP, level up locations, and build better pond records.
                 </p>
               </div>
 
               <div style={styles.scoreCard}>
-                <p style={styles.scoreLabel}>Pond Health Score</p>
-                <h3 style={styles.score}>78</h3>
-                <div style={styles.progressBack}>
-                  <div style={styles.progressFill}></div>
-                </div>
+                {isPersonalPond ? (
+                  <>
+                    <p style={styles.scoreLabel}>Pond Health Score</p>
+                    <h3 style={styles.score}>{pondHealthScore}</h3>
+                    <div style={styles.progressBack}>
+                      <div style={{ ...styles.progressFill, width: `${pondHealthScore}%` }} />
+                    </div>
+                    <p style={styles.scoreText}>
+                      Based on catches, notes, level, and activity.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p style={styles.scoreLabel}>Location Level</p>
+                    <h3 style={styles.score}>Lv. {currentLevel}</h3>
+                    <div style={styles.progressBack}>
+                      <div style={{ ...styles.progressFill, width: `${currentXP % 100}%` }} />
+                    </div>
+                    <p style={styles.scoreText}>
+                      Public locations use XP and levels, not pond health score.
+                    </p>
+                  </>
+                )}
               </div>
             </section>
 
             <section style={styles.grid}>
+              <Card title="Level" value={`Lv. ${currentLevel}`} emoji="⭐" theme={theme} />
+              <Card title="XP" value={String(currentXP)} emoji="⚡" theme={theme} />
+              <Card title="Next Level" value={`${getXPForNextLevel(currentXP)} XP`} emoji="⬆️" theme={theme} />
               <Card title="Logged Catches" value={String(pondCatches.length)} emoji="🎣" theme={theme} />
               <Card title="Personal Records" value={String(personalRecords.length)} emoji="🏆" theme={theme} />
-              <Card title="Map Waters" value={String(nearbyWaters.length)} emoji="🗺️" theme={theme} />
-              <Card title="AI Questions" value={String(aiHistory.length)} emoji="💬" theme={theme} />
+              <Card title="Pond Notes" value={String(pondNotes.length)} emoji="📝" theme={theme} />
             </section>
           </>
         )}
@@ -753,14 +742,15 @@ export default function App() {
           <Panel theme={theme}>
             <h2>Stocking Planner</h2>
 
+            {!isPersonalPond && (
+              <p style={{ color: theme.muted, fontWeight: 800 }}>
+                This is a named public location. Stocking plans are mainly for personal ponds.
+              </p>
+            )}
+
             <label style={styles.label}>Pond size in acres</label>
             <input
-              style={{
-                ...styles.input,
-                background: theme.input,
-                color: theme.text,
-                borderColor: theme.border,
-              }}
+              style={{ ...styles.input, background: theme.input, color: theme.text, borderColor: theme.border }}
               type="number"
               step="0.05"
               value={pondSize}
@@ -769,12 +759,7 @@ export default function App() {
 
             <label style={styles.label}>Main goal</label>
             <select
-              style={{
-                ...styles.input,
-                background: theme.input,
-                color: theme.text,
-                borderColor: theme.border,
-              }}
+              style={{ ...styles.input, background: theme.input, color: theme.text, borderColor: theme.border }}
               value={goal}
               onChange={(e) => setGoal(e.target.value)}
             >
@@ -815,6 +800,9 @@ export default function App() {
         {tab === "catchlog" && (
           <Panel theme={theme}>
             <h2>Fish Catch Log</h2>
+            <p style={{ color: theme.muted, fontWeight: 800 }}>
+              +25 XP for each catch logged.
+            </p>
 
             <form onSubmit={addCatch} style={styles.catchForm}>
               <input placeholder="Species" value={newCatch.species} onChange={(e) => setNewCatch({ ...newCatch, species: e.target.value })} style={{ ...styles.input, background: theme.input, color: theme.text, borderColor: theme.border }} />
@@ -850,12 +838,7 @@ export default function App() {
 
             <div style={styles.mapControls}>
               <select
-                style={{
-                  ...styles.input,
-                  background: theme.input,
-                  color: theme.text,
-                  borderColor: theme.border,
-                }}
+                style={{ ...styles.input, background: theme.input, color: theme.text, borderColor: theme.border }}
                 value={mapRadius}
                 onChange={(e) => setMapRadius(Number(e.target.value))}
               >
@@ -879,11 +862,7 @@ export default function App() {
             {mapError && <p style={styles.error}>{mapError}</p>}
 
             <div style={styles.realMapBox}>
-              <MapContainer
-                center={[LAKE_CHARLESTON.lat, LAKE_CHARLESTON.lng]}
-                zoom={8}
-                style={{ height: "100%", width: "100%" }}
-              >
+              <MapContainer center={[LAKE_CHARLESTON.lat, LAKE_CHARLESTON.lng]} zoom={8} style={{ height: "100%", width: "100%" }}>
                 <MapUpdater center={LAKE_CHARLESTON} radius={mapRadius} />
 
                 <TileLayer
@@ -891,31 +870,14 @@ export default function App() {
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
 
-                <CircleMarker
-                  center={[LAKE_CHARLESTON.lat, LAKE_CHARLESTON.lng]}
-                  radius={12}
-                  pathOptions={{
-                    color: "#ef4444",
-                    fillColor: "#ef4444",
-                    fillOpacity: 0.9,
-                  }}
-                >
+                <CircleMarker center={[LAKE_CHARLESTON.lat, LAKE_CHARLESTON.lng]} radius={12} pathOptions={{ color: "#ef4444", fillColor: "#ef4444", fillOpacity: 0.9 }}>
                   <Popup>
                     <strong>Lake Charleston Area</strong>
                   </Popup>
                 </CircleMarker>
 
                 {nearbyWaters.map((water) => (
-                  <CircleMarker
-                    key={water.id}
-                    center={[water.lat, water.lng]}
-                    radius={8}
-                    pathOptions={{
-                      color: "#0f766e",
-                      fillColor: "#22c55e",
-                      fillOpacity: 0.8,
-                    }}
-                  >
+                  <CircleMarker key={water.id} center={[water.lat, water.lng]} radius={8} pathOptions={{ color: "#0f766e", fillColor: "#22c55e", fillOpacity: 0.8 }}>
                     <Popup>
                       <strong>{water.name}</strong>
                       <br />
@@ -932,7 +894,6 @@ export default function App() {
 
             <p style={{ color: theme.muted, fontWeight: 800, marginTop: 14 }}>
               Found {nearbyWaters.length} named lakes, ponds, or reservoirs.
-              Use smaller radius if 200 miles loads slowly.
             </p>
           </Panel>
         )}
@@ -944,29 +905,21 @@ export default function App() {
             <form onSubmit={addPond} style={styles.catchForm}>
               <input placeholder="Pond name" value={newPond.name} onChange={(e) => setNewPond({ ...newPond, name: e.target.value })} style={{ ...styles.input, background: theme.input, color: theme.text, borderColor: theme.border }} />
               <input placeholder="Location" value={newPond.location} onChange={(e) => setNewPond({ ...newPond, location: e.target.value })} style={{ ...styles.input, background: theme.input, color: theme.text, borderColor: theme.border }} />
-              <button style={styles.primaryButton}>Add Pond</button>
+              <button style={styles.primaryButton}>Add Personal Pond</button>
             </form>
 
             <div style={styles.grid}>
               {ponds.map((pond) => (
-                <div
-                  key={pond.id}
-                  style={{
-                    ...styles.card,
-                    background: theme.card,
-                    borderColor: theme.border,
-                  }}
-                >
-                  <div style={styles.cardEmoji}>🌊</div>
+                <div key={pond.id} style={{ ...styles.card, background: theme.card, borderColor: theme.border }}>
+                  <div style={styles.cardEmoji}>{pond.is_personal === false ? "📍" : "🌊"}</div>
                   <p style={{ ...styles.cardTitle, color: theme.muted }}>
-                    {pond.location}
+                    {pond.is_personal === false ? "Named Public Location" : "Personal Pond"}
                   </p>
                   <h3 style={styles.cardValue}>{pond.name}</h3>
-                  <button
-                    style={{ ...styles.deleteButton, marginTop: "16px" }}
-                    onClick={() => deletePond(pond.id)}
-                  >
-                    Delete Pond
+                  <p style={{ color: theme.muted, fontWeight: 800 }}>{pond.location}</p>
+                  <p style={{ fontWeight: 900 }}>Lv. {pond.level || 1} • {pond.xp || 0} XP</p>
+                  <button style={{ ...styles.deleteButton, marginTop: "16px" }} onClick={() => deletePond(pond.id)}>
+                    Delete
                   </button>
                 </div>
               ))}
@@ -977,43 +930,29 @@ export default function App() {
         {tab === "notes" && (
           <Panel theme={theme}>
             <h2>Pond Notes</h2>
+            <p style={{ color: theme.muted, fontWeight: 800 }}>
+              +10 XP for each note saved.
+            </p>
 
             <form onSubmit={addNote}>
               <textarea
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 placeholder="Write a pond note..."
-                style={{
-                  ...styles.textarea,
-                  background: theme.input,
-                  color: theme.text,
-                  borderColor: theme.border,
-                }}
+                style={{ ...styles.textarea, background: theme.input, color: theme.text, borderColor: theme.border }}
               />
               <button style={styles.primaryButton}>Save Note</button>
             </form>
 
             <div style={styles.noteList}>
               {pondNotes.map((item) => (
-                <div
-                  key={item.id}
-                  style={{
-                    ...styles.noteCard,
-                    background: theme.soft,
-                    borderColor: theme.border,
-                  }}
-                >
+                <div key={item.id} style={{ ...styles.noteCard, background: theme.soft, borderColor: theme.border }}>
                   <div>
-                    <strong>
-                      {new Date(item.created_at).toLocaleDateString()}
-                    </strong>
+                    <strong>{new Date(item.created_at).toLocaleDateString()}</strong>
                     <p>{item.note}</p>
                   </div>
 
-                  <button
-                    style={styles.deleteButton}
-                    onClick={() => deleteNote(item.id)}
-                  >
+                  <button style={styles.deleteButton} onClick={() => deleteNote(item.id)}>
                     Delete
                   </button>
                 </div>
@@ -1030,12 +969,7 @@ export default function App() {
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
               placeholder="Ask a pond question..."
-              style={{
-                ...styles.textarea,
-                background: theme.input,
-                color: theme.text,
-                borderColor: theme.border,
-              }}
+              style={{ ...styles.textarea, background: theme.input, color: theme.text, borderColor: theme.border }}
             />
 
             <button style={styles.primaryButton} onClick={askPondPal}>
@@ -1058,23 +992,11 @@ export default function App() {
               )}
 
               {aiHistory.map((item) => (
-                <div
-                  key={item.id}
-                  style={{
-                    ...styles.noteCard,
-                    background: theme.soft,
-                    borderColor: theme.border,
-                    marginBottom: "12px",
-                  }}
-                >
+                <div key={item.id} style={{ ...styles.noteCard, background: theme.soft, borderColor: theme.border, marginBottom: "12px" }}>
                   <div>
                     <strong>{item.date}</strong>
-                    <p>
-                      <b>You:</b> {item.question}
-                    </p>
-                    <p>
-                      <b>PondPal:</b> {item.answer}
-                    </p>
+                    <p><b>You:</b> {item.question}</p>
+                    <p><b>PondPal:</b> {item.answer}</p>
                   </div>
                 </div>
               ))}
@@ -1136,13 +1058,7 @@ function SideButton({ label, icon, active, onClick, theme }) {
 
 function Card({ title, value, emoji, theme }) {
   return (
-    <div
-      style={{
-        ...styles.card,
-        background: theme.card,
-        borderColor: theme.border,
-      }}
-    >
+    <div style={{ ...styles.card, background: theme.card, borderColor: theme.border }}>
       <div style={styles.cardEmoji}>{emoji}</div>
       <p style={{ ...styles.cardTitle, color: theme.muted }}>{title}</p>
       <h3 style={styles.cardValue}>{value}</h3>
@@ -1152,13 +1068,7 @@ function Card({ title, value, emoji, theme }) {
 
 function Panel({ children, theme }) {
   return (
-    <section
-      style={{
-        ...styles.panel,
-        background: theme.card,
-        borderColor: theme.border,
-      }}
-    >
+    <section style={{ ...styles.panel, background: theme.card, borderColor: theme.border }}>
       {children}
     </section>
   );
@@ -1166,11 +1076,7 @@ function Panel({ children, theme }) {
 
 function RecordTable({ rows, theme, deleteCatch, showAction = false }) {
   if (!rows.length) {
-    return (
-      <p style={{ color: theme.muted, fontWeight: 800 }}>
-        No catches logged yet.
-      </p>
-    );
+    return <p style={{ color: theme.muted, fontWeight: 800 }}>No catches logged yet.</p>;
   }
 
   return (
@@ -1193,11 +1099,7 @@ function RecordTable({ rows, theme, deleteCatch, showAction = false }) {
             <tr key={fish.id} style={{ borderTop: `1px solid ${theme.border}` }}>
               <td style={styles.td}>
                 {fish.photo_url ? (
-                  <img
-                    src={fish.photo_url}
-                    alt={fish.species}
-                    style={styles.catchPhoto}
-                  />
+                  <img src={fish.photo_url} alt={fish.species} style={styles.catchPhoto} />
                 ) : (
                   "-"
                 )}
@@ -1209,10 +1111,7 @@ function RecordTable({ rows, theme, deleteCatch, showAction = false }) {
               <td style={styles.td}>{fish.caught_at || "-"}</td>
               {showAction && (
                 <td style={styles.td}>
-                  <button
-                    style={styles.deleteButton}
-                    onClick={() => deleteCatch(fish.id)}
-                  >
+                  <button style={styles.deleteButton} onClick={() => deleteCatch(fish.id)}>
                     Delete
                   </button>
                 </td>
@@ -1227,11 +1126,7 @@ function RecordTable({ rows, theme, deleteCatch, showAction = false }) {
 
 function LeaderboardTable({ rows, theme }) {
   if (!rows.length) {
-    return (
-      <p style={{ color: theme.muted, fontWeight: 800 }}>
-        No catches logged for this pond yet.
-      </p>
-    );
+    return <p style={{ color: theme.muted, fontWeight: 800 }}>No catches logged for this pond yet.</p>;
   }
 
   return (
@@ -1252,13 +1147,7 @@ function LeaderboardTable({ rows, theme }) {
           {rows.map((fish, index) => (
             <tr key={fish.id} style={{ borderTop: `1px solid ${theme.border}` }}>
               <td style={styles.td}>
-                {index === 0
-                  ? "🥇"
-                  : index === 1
-                  ? "🥈"
-                  : index === 2
-                  ? "🥉"
-                  : `#${index + 1}`}
+                {index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : `#${index + 1}`}
               </td>
               <td style={styles.td}>{fish.species}</td>
               <td style={styles.td}>{fish.weight ? `${fish.weight} lb` : "-"}</td>
@@ -1296,324 +1185,63 @@ const dark = {
 };
 
 const styles = {
-  authPage: {
-    minHeight: "100vh",
-    display: "grid",
-    placeItems: "center",
-    fontFamily: "Arial, sans-serif",
-    padding: "24px",
-  },
-  authCard: {
-    width: "100%",
-    maxWidth: "430px",
-    background: "white",
-    borderRadius: "30px",
-    padding: "34px",
-    boxShadow: "0 20px 50px rgba(15,23,42,.12)",
-  },
-  authLogo: {
-    fontSize: "38px",
-    margin: 0,
-  },
-  authForm: {
-    display: "grid",
-    gap: "12px",
-    marginTop: "20px",
-  },
-  error: {
-    color: "#ef4444",
-    fontWeight: 800,
-  },
-  linkButton: {
-    border: "none",
-    background: "transparent",
-    color: "#0f766e",
-    fontWeight: 900,
-    cursor: "pointer",
-    marginTop: "16px",
-  },
+  authPage: { minHeight: "100vh", display: "grid", placeItems: "center", fontFamily: "Arial, sans-serif", padding: "24px" },
+  authCard: { width: "100%", maxWidth: "430px", background: "white", borderRadius: "30px", padding: "34px", boxShadow: "0 20px 50px rgba(15,23,42,.12)" },
+  authLogo: { fontSize: "38px", margin: 0 },
+  authForm: { display: "grid", gap: "12px", marginTop: "20px" },
+  error: { color: "#ef4444", fontWeight: 800 },
+  linkButton: { border: "none", background: "transparent", color: "#0f766e", fontWeight: 900, cursor: "pointer", marginTop: "16px" },
 
-  app: {
-    minHeight: "100vh",
-    display: "flex",
-    fontFamily: "Arial, sans-serif",
-  },
-  sidebar: {
-    width: "285px",
-    padding: "20px",
-    borderRight: "1px solid",
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "space-between",
-    position: "sticky",
-    top: 0,
-    height: "100vh",
-    boxSizing: "border-box",
-    overflowY: "auto",
-  },
-  logo: {
-    fontSize: "30px",
-    margin: 0,
-  },
-  sidebarSub: {
-    marginTop: "6px",
-    fontWeight: 700,
-    fontSize: "13px",
-    wordBreak: "break-word",
-  },
-  pondSelect: {
-    width: "100%",
-    marginTop: "14px",
-    padding: "12px",
-    borderRadius: "16px",
-    border: "1px solid",
-    fontWeight: 800,
-  },
-  sideNav: {
-    display: "grid",
-    gap: "10px",
-    marginTop: "24px",
-  },
-  sideButton: {
-    border: "none",
-    borderRadius: "18px",
-    padding: "14px 16px",
-    cursor: "pointer",
-    fontWeight: "800",
-    fontSize: "15px",
-    display: "flex",
-    gap: "12px",
-    alignItems: "center",
-    textAlign: "left",
-    whiteSpace: "nowrap",
-  },
-  modeButton: {
-    border: "1px solid",
-    borderRadius: "999px",
-    padding: "14px",
-    fontWeight: "900",
-    cursor: "pointer",
-  },
-  logoutButton: {
-    background: "#ef4444",
-    color: "white",
-    border: "none",
-    borderRadius: "999px",
-    padding: "14px",
-    fontWeight: "900",
-    cursor: "pointer",
-  },
+  app: { minHeight: "100vh", display: "flex", fontFamily: "Arial, sans-serif" },
+  sidebar: { width: "285px", padding: "20px", borderRight: "1px solid", display: "flex", flexDirection: "column", justifyContent: "space-between", position: "sticky", top: 0, height: "100vh", boxSizing: "border-box", overflowY: "auto" },
+  logo: { fontSize: "30px", margin: 0 },
+  sidebarSub: { marginTop: "6px", fontWeight: 700, fontSize: "13px", wordBreak: "break-word" },
+  pondSelect: { width: "100%", marginTop: "14px", padding: "12px", borderRadius: "16px", border: "1px solid", fontWeight: 800 },
+  sideNav: { display: "grid", gap: "10px", marginTop: "24px" },
+  sideButton: { border: "none", borderRadius: "18px", padding: "14px 16px", cursor: "pointer", fontWeight: "800", fontSize: "15px", display: "flex", gap: "12px", alignItems: "center", textAlign: "left", whiteSpace: "nowrap" },
+  modeButton: { border: "1px solid", borderRadius: "999px", padding: "14px", fontWeight: "900", cursor: "pointer" },
+  logoutButton: { background: "#ef4444", color: "white", border: "none", borderRadius: "999px", padding: "14px", fontWeight: "900", cursor: "pointer" },
 
-  main: {
-    flex: 1,
-    padding: "28px",
-    maxWidth: "1240px",
-    width: "100%",
-    boxSizing: "border-box",
-  },
-  topbar: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: "24px",
-    gap: "16px",
-    flexWrap: "wrap",
-  },
-  pageTitle: {
-    margin: 0,
-    fontSize: "clamp(28px, 7vw, 34px)",
-  },
-  subtitle: {
-    marginTop: "6px",
-    fontWeight: 700,
-  },
-  primaryButton: {
-    background: "#0f766e",
-    color: "white",
-    border: "none",
-    borderRadius: "999px",
-    padding: "14px 22px",
-    fontWeight: "900",
-    cursor: "pointer",
-  },
+  main: { flex: 1, padding: "28px", maxWidth: "1240px", width: "100%", boxSizing: "border-box" },
+  topbar: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px", gap: "16px", flexWrap: "wrap" },
+  pageTitle: { margin: 0, fontSize: "clamp(28px, 7vw, 34px)" },
+  subtitle: { marginTop: "6px", fontWeight: 700 },
+  primaryButton: { background: "#0f766e", color: "white", border: "none", borderRadius: "999px", padding: "14px 22px", fontWeight: "900", cursor: "pointer" },
 
-  hero: {
-    background: "linear-gradient(135deg, #064e3b, #0891b2)",
-    color: "white",
-    borderRadius: "34px",
-    padding: "clamp(22px, 5vw, 36px)",
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-    gap: "24px",
-    boxShadow: "0 20px 50px rgba(15,118,110,.25)",
-    marginBottom: "22px",
-  },
-  heroTitle: {
-    fontSize: "clamp(34px, 8vw, 46px)",
-    margin: "0 0 14px",
-    lineHeight: 1,
-  },
-  heroText: {
-    fontSize: "18px",
-    lineHeight: 1.6,
-    opacity: 0.9,
-  },
-  scoreCard: {
-    background: "rgba(255,255,255,.15)",
-    borderRadius: "28px",
-    padding: "24px",
-  },
-  scoreLabel: {
-    margin: 0,
-    opacity: 0.8,
-    fontWeight: 700,
-  },
-  score: {
-    fontSize: "64px",
-    margin: "10px 0",
-  },
-  progressBack: {
-    background: "rgba(255,255,255,.25)",
-    height: "12px",
-    borderRadius: "999px",
-    overflow: "hidden",
-  },
-  progressFill: {
-    width: "78%",
-    background: "#bef264",
-    height: "100%",
-  },
+  badge: { display: "inline-block", background: "rgba(255,255,255,.18)", padding: "8px 12px", borderRadius: "999px", fontWeight: 900, margin: "0 0 14px" },
+  hero: { background: "linear-gradient(135deg, #064e3b, #0891b2)", color: "white", borderRadius: "34px", padding: "clamp(22px, 5vw, 36px)", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "24px", boxShadow: "0 20px 50px rgba(15,118,110,.25)", marginBottom: "22px" },
+  heroTitle: { fontSize: "clamp(34px, 8vw, 46px)", margin: "0 0 14px", lineHeight: 1 },
+  heroText: { fontSize: "18px", lineHeight: 1.6, opacity: 0.9 },
+  scoreCard: { background: "rgba(255,255,255,.15)", borderRadius: "28px", padding: "24px" },
+  scoreLabel: { margin: 0, opacity: 0.8, fontWeight: 700 },
+  score: { fontSize: "64px", margin: "10px 0" },
+  scoreText: { fontWeight: 800, lineHeight: 1.4 },
+  progressBack: { background: "rgba(255,255,255,.25)", height: "12px", borderRadius: "999px", overflow: "hidden" },
+  progressFill: { background: "#bef264", height: "100%" },
 
-  grid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
-    gap: "18px",
-  },
-  card: {
-    border: "1px solid",
-    borderRadius: "26px",
-    padding: "26px",
-    boxShadow: "0 12px 30px rgba(15,23,42,.08)",
-  },
-  cardEmoji: {
-    fontSize: "34px",
-  },
-  cardTitle: {
-    fontWeight: 800,
-  },
-  cardValue: {
-    fontSize: "28px",
-    margin: 0,
-  },
+  grid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: "18px" },
+  card: { border: "1px solid", borderRadius: "26px", padding: "26px", boxShadow: "0 12px 30px rgba(15,23,42,.08)" },
+  cardEmoji: { fontSize: "34px" },
+  cardTitle: { fontWeight: 800 },
+  cardValue: { fontSize: "28px", margin: 0 },
 
-  panel: {
-    border: "1px solid",
-    borderRadius: "28px",
-    padding: "clamp(18px, 5vw, 30px)",
-    boxShadow: "0 12px 30px rgba(15,23,42,.08)",
-  },
-  label: {
-    display: "block",
-    marginTop: "18px",
-    marginBottom: "8px",
-    fontWeight: "900",
-  },
-  input: {
-    width: "100%",
-    padding: "14px",
-    borderRadius: "16px",
-    border: "1px solid",
-    fontSize: "16px",
-    boxSizing: "border-box",
-  },
-  resultBox: {
-    marginTop: "22px",
-    borderRadius: "22px",
-    padding: "20px",
-  },
-  check: {
-    fontSize: "17px",
-    fontWeight: "700",
-  },
-  textarea: {
-    width: "100%",
-    minHeight: "150px",
-    padding: "16px",
-    borderRadius: "18px",
-    border: "1px solid",
-    fontSize: "16px",
-    marginBottom: "16px",
-    boxSizing: "border-box",
-  },
-  answer: {
-    marginTop: "20px",
-    padding: "20px",
-    borderRadius: "20px",
-    fontWeight: "800",
-    lineHeight: 1.6,
-  },
-  catchForm: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
-    gap: "12px",
-    marginBottom: "24px",
-  },
-  noteList: {
-    display: "grid",
-    gap: "12px",
-    marginTop: "18px",
-  },
-  noteCard: {
-    border: "1px solid",
-    borderRadius: "20px",
-    padding: "18px",
-    display: "flex",
-    justifyContent: "space-between",
-    gap: "16px",
-    alignItems: "flex-start",
-  },
+  panel: { border: "1px solid", borderRadius: "28px", padding: "clamp(18px, 5vw, 30px)", boxShadow: "0 12px 30px rgba(15,23,42,.08)" },
+  label: { display: "block", marginTop: "18px", marginBottom: "8px", fontWeight: "900" },
+  input: { width: "100%", padding: "14px", borderRadius: "16px", border: "1px solid", fontSize: "16px", boxSizing: "border-box" },
+  resultBox: { marginTop: "22px", borderRadius: "22px", padding: "20px" },
+  check: { fontSize: "17px", fontWeight: "700" },
+  textarea: { width: "100%", minHeight: "150px", padding: "16px", borderRadius: "18px", border: "1px solid", fontSize: "16px", marginBottom: "16px", boxSizing: "border-box" },
+  answer: { marginTop: "20px", padding: "20px", borderRadius: "20px", fontWeight: "800", lineHeight: 1.6 },
+  catchForm: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: "12px", marginBottom: "24px" },
+  noteList: { display: "grid", gap: "12px", marginTop: "18px" },
+  noteCard: { border: "1px solid", borderRadius: "20px", padding: "18px", display: "flex", justifyContent: "space-between", gap: "16px", alignItems: "flex-start" },
 
-  table: {
-    width: "100%",
-    borderCollapse: "collapse",
-    minWidth: "820px",
-  },
-  th: {
-    textAlign: "left",
-    padding: "14px",
-    color: "#0f766e",
-  },
-  td: {
-    padding: "14px",
-    fontWeight: "700",
-  },
-  deleteButton: {
-    background: "#ef4444",
-    color: "white",
-    border: "none",
-    borderRadius: "999px",
-    padding: "9px 14px",
-    fontWeight: "900",
-    cursor: "pointer",
-  },
-  catchPhoto: {
-    width: "70px",
-    height: "70px",
-    objectFit: "cover",
-    borderRadius: "14px",
-  },
+  table: { width: "100%", borderCollapse: "collapse", minWidth: "820px" },
+  th: { textAlign: "left", padding: "14px", color: "#0f766e" },
+  td: { padding: "14px", fontWeight: "700" },
+  deleteButton: { background: "#ef4444", color: "white", border: "none", borderRadius: "999px", padding: "9px 14px", fontWeight: "900", cursor: "pointer" },
+  catchPhoto: { width: "70px", height: "70px", objectFit: "cover", borderRadius: "14px" },
 
-  mapControls: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-    gap: "12px",
-    marginBottom: "16px",
-  },
-  realMapBox: {
-    height: "min(70vh, 560px)",
-    minHeight: "420px",
-    borderRadius: "24px",
-    overflow: "hidden",
-    border: "1px solid #dbeafe",
-  },
+  mapControls: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px", marginBottom: "16px" },
+  realMapBox: { height: "min(70vh, 560px)", minHeight: "420px", borderRadius: "24px", overflow: "hidden", border: "1px solid #dbeafe" },
 };
