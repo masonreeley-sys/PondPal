@@ -1150,14 +1150,16 @@ export default function App() {
             </p>
           </div>
 
-          <a
-            href="YOUR_DONATION_LINK_HERE"
-            target="_blank"
-            rel="noreferrer"
-            style={styles.donationButton}
-          >
-            Donate
-          </a>
+          <div style={styles.qrWrap}>
+            <img
+              src="/venmo-qr.png"
+              alt="Donate to PondPal with Venmo"
+              style={styles.qrCode}
+            />
+            <p style={{ margin: 0, fontWeight: 800, color: theme.text }}>
+              Scan to support PondPal
+            </p>
+          </div>
         </div>
       </main>
     </div>
@@ -1471,14 +1473,21 @@ const styles = {
     flexWrap: "wrap",
   },
 
-  donationButton: {
-    background: "#f59e0b",
-    color: "#111827",
-    textDecoration: "none",
-    borderRadius: "999px",
-    padding: "13px 20px",
-    fontWeight: 900,
-    display: "inline-block",
+  qrWrap: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "10px",
+  },
+
+  qrCode: {
+    width: "150px",
+    height: "150px",
+    objectFit: "cover",
+    borderRadius: "16px",
+    border: "1px solid #dbeafe",
+    background: "white",
+    padding: "8px",
   },
 
   table: { width: "100%", borderCollapse: "collapse", minWidth: "920px" },
