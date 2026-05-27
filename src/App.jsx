@@ -57,6 +57,7 @@ export default function App() {
   const [newPond, setNewPond] = useState({ name: "", location: "" });
 
   const [catches, setCatches] = useState([]);
+  const [identifyingFish, setIdentifyingFish] = useState(false);
   const [newCatch, setNewCatch] = useState({
     species: "",
     length: "",
@@ -64,6 +65,11 @@ export default function App() {
     location: "",
     caught_at: new Date().toISOString().slice(0, 10),
     photoFile: null,
+    photo_url: "",
+    ai_species: "",
+    ai_confidence: null,
+    estimated_length: "",
+    estimate_notes: "",
   });
 
   const [notes, setNotes] = useState([]);
@@ -132,10 +138,7 @@ export default function App() {
 
     await Promise.all(
       pondsToFix.map((pond) =>
-        supabase
-          .from("ponds")
-          .update({ is_personal: false })
-          .eq("id", pond.id)
+        supabase.from("ponds").update({ is_personal: false }).eq("id", pond.id)
       )
     );
 
@@ -426,13 +429,64 @@ export default function App() {
     return data.publicUrl;
   }
 
+  async function identifyFish() {
+    if (!newCatch.photoFile && !newCatch.photo_url) {
+      alert("Choose a fish photo first.");
+      return;
+    }
+
+    setIdentifyingFish(true);
+
+    try {
+      let photoUrl = newCatch.photo_url;
+
+      if (!photoUrl && newCatch.photoFile) {
+        photoUrl = await uploadCatchPhoto(newCatch.photoFile);
+      }
+
+      if (!photoUrl) {
+        alert("Photo upload failed.");
+        return;
+      }
+
+      const response = await fetch("/api/identify-fish", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ imageUrl: photoUrl }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Fish identification failed.");
+      }
+
+      setNewCatch((old) => ({
+        ...old,
+        photo_url: photoUrl,
+        species: result.species && result.species !== "Unknown" ? result.species : old.species,
+        length: result.estimated_length_inches ? String(result.estimated_length_inches) : old.length,
+        ai_species: result.species || "Unknown",
+        ai_confidence: result.confidence ?? 0,
+        estimated_length: result.estimated_length_inches ? String(result.estimated_length_inches) : "",
+        estimate_notes: result.notes || "",
+      }));
+    } catch (error) {
+      alert(error.message);
+    } finally {
+      setIdentifyingFish(false);
+    }
+  }
+
   async function addCatch(e) {
     e.preventDefault();
     if (!newCatch.species.trim() || !selectedPondId) return;
 
-    let photoUrl = "";
+    let photoUrl = newCatch.photo_url || "";
 
-    if (newCatch.photoFile) {
+    if (!photoUrl && newCatch.photoFile) {
       photoUrl = await uploadCatchPhoto(newCatch.photoFile);
     }
 
@@ -447,12 +501,17 @@ export default function App() {
         location: newCatch.location,
         caught_at: newCatch.caught_at,
         photo_url: photoUrl || null,
+        ai_species: newCatch.ai_species || null,
+        ai_confidence: newCatch.ai_confidence ?? null,
+        estimated_length: newCatch.estimated_length || null,
+        estimate_notes: newCatch.estimate_notes || null,
       })
       .select()
       .single();
 
     if (!error && data) {
       setCatches([data, ...catches]);
+
       setNewCatch({
         species: "",
         length: "",
@@ -460,6 +519,11 @@ export default function App() {
         location: "",
         caught_at: new Date().toISOString().slice(0, 10),
         photoFile: null,
+        photo_url: "",
+        ai_species: "",
+        ai_confidence: null,
+        estimated_length: "",
+        estimate_notes: "",
       });
 
       await updatePondXP(selectedPondId, 25);
@@ -795,7 +859,9 @@ export default function App() {
         {tab === "catchlog" && (
           <Panel theme={theme}>
             <h2>Fish Catch Log</h2>
-            <p style={{ color: theme.muted, fontWeight: 800 }}>+25 XP for each catch logged.</p>
+            <p style={{ color: theme.muted, fontWeight: 800 }}>
+              +25 XP for each catch logged. Fish ID needs a clear fish photo.
+            </p>
 
             <form onSubmit={addCatch} style={styles.catchForm}>
               <input placeholder="Species" value={newCatch.species} onChange={(e) => setNewCatch({ ...newCatch, species: e.target.value })} style={{ ...styles.input, background: theme.input, color: theme.text, borderColor: theme.border }} />
@@ -803,9 +869,25 @@ export default function App() {
               <input placeholder="Weight lbs" value={newCatch.weight} onChange={(e) => setNewCatch({ ...newCatch, weight: e.target.value })} style={{ ...styles.input, background: theme.input, color: theme.text, borderColor: theme.border }} />
               <input placeholder="Location" value={newCatch.location} onChange={(e) => setNewCatch({ ...newCatch, location: e.target.value })} style={{ ...styles.input, background: theme.input, color: theme.text, borderColor: theme.border }} />
               <input type="date" value={newCatch.caught_at} onChange={(e) => setNewCatch({ ...newCatch, caught_at: e.target.value })} style={{ ...styles.input, background: theme.input, color: theme.text, borderColor: theme.border }} />
-              <input type="file" accept="image/*" onChange={(e) => setNewCatch({ ...newCatch, photoFile: e.target.files[0] })} style={{ ...styles.input, background: theme.input, color: theme.text, borderColor: theme.border }} />
+              <input type="file" accept="image/*" onChange={(e) => setNewCatch({ ...newCatch, photoFile: e.target.files[0], photo_url: "" })} style={{ ...styles.input, background: theme.input, color: theme.text, borderColor: theme.border }} />
+              <button type="button" style={styles.secondaryButton} onClick={identifyFish} disabled={identifyingFish}>
+                {identifyingFish ? "Identifying..." : "Identify Fish"}
+              </button>
               <button style={styles.primaryButton}>Add Catch</button>
             </form>
+
+            {(newCatch.ai_species || newCatch.estimate_notes) && (
+              <div style={{ ...styles.aiResultBox, background: theme.soft, borderColor: theme.border }}>
+                <h3>AI Fish ID</h3>
+                <p><b>Species:</b> {newCatch.ai_species || "Unknown"}</p>
+                <p><b>Confidence:</b> {newCatch.ai_confidence ?? 0}%</p>
+                <p><b>Estimated Length:</b> {newCatch.estimated_length ? `${newCatch.estimated_length} in` : "No reliable estimate"}</p>
+                <p><b>Notes:</b> {newCatch.estimate_notes || "No notes."}</p>
+                <p style={{ color: theme.muted, fontWeight: 800 }}>
+                  AI can be wrong. Confirm species and size before saving.
+                </p>
+              </div>
+            )}
 
             <RecordTable rows={pondCatches} theme={theme} deleteCatch={deleteCatch} showAction />
           </Panel>
@@ -1061,6 +1143,7 @@ function RecordTable({ rows, theme, deleteCatch, showAction = false }) {
           <tr>
             <th style={styles.th}>Photo</th>
             <th style={styles.th}>Species</th>
+            <th style={styles.th}>AI ID</th>
             <th style={styles.th}>Length</th>
             <th style={styles.th}>Weight</th>
             <th style={styles.th}>Location</th>
@@ -1080,6 +1163,19 @@ function RecordTable({ rows, theme, deleteCatch, showAction = false }) {
                 )}
               </td>
               <td style={styles.td}>{fish.species}</td>
+              <td style={styles.td}>
+                {fish.ai_species ? (
+                  <>
+                    {fish.ai_species}
+                    <br />
+                    <span style={{ fontSize: "12px", color: theme.muted }}>
+                      {fish.ai_confidence || 0}% confident
+                    </span>
+                  </>
+                ) : (
+                  "-"
+                )}
+              </td>
               <td style={styles.td}>{fish.length ? `${fish.length} in` : "-"}</td>
               <td style={styles.td}>{fish.weight ? `${fish.weight} lb` : "-"}</td>
               <td style={styles.td}>{fish.location || "-"}</td>
@@ -1182,6 +1278,7 @@ const styles = {
   pageTitle: { margin: 0, fontSize: "clamp(28px, 7vw, 34px)" },
   subtitle: { marginTop: "6px", fontWeight: 700 },
   primaryButton: { background: "#0f766e", color: "white", border: "none", borderRadius: "999px", padding: "14px 22px", fontWeight: "900", cursor: "pointer" },
+  secondaryButton: { background: "#2563eb", color: "white", border: "none", borderRadius: "999px", padding: "14px 22px", fontWeight: "900", cursor: "pointer" },
 
   badge: { display: "inline-block", background: "rgba(255,255,255,.18)", padding: "8px 12px", borderRadius: "999px", fontWeight: 900, margin: "0 0 14px" },
   hero: { background: "linear-gradient(135deg, #064e3b, #0891b2)", color: "white", borderRadius: "34px", padding: "clamp(22px, 5vw, 36px)", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "24px", boxShadow: "0 20px 50px rgba(15,118,110,.25)", marginBottom: "22px" },
@@ -1205,6 +1302,7 @@ const styles = {
   label: { display: "block", marginTop: "18px", marginBottom: "8px", fontWeight: "900" },
   input: { width: "100%", padding: "14px", borderRadius: "16px", border: "1px solid", fontSize: "16px", boxSizing: "border-box" },
   resultBox: { marginTop: "22px", borderRadius: "22px", padding: "20px" },
+  aiResultBox: { border: "1px solid", borderRadius: "22px", padding: "18px", marginBottom: "22px" },
   check: { fontSize: "17px", fontWeight: "700" },
   textarea: { width: "100%", minHeight: "150px", padding: "16px", borderRadius: "18px", border: "1px solid", fontSize: "16px", marginBottom: "16px", boxSizing: "border-box" },
   answer: { marginTop: "20px", padding: "20px", borderRadius: "20px", fontWeight: "800", lineHeight: 1.6 },
@@ -1212,7 +1310,7 @@ const styles = {
   noteList: { display: "grid", gap: "12px", marginTop: "18px" },
   noteCard: { border: "1px solid", borderRadius: "20px", padding: "18px", display: "flex", justifyContent: "space-between", gap: "16px", alignItems: "flex-start" },
 
-  table: { width: "100%", borderCollapse: "collapse", minWidth: "820px" },
+  table: { width: "100%", borderCollapse: "collapse", minWidth: "920px" },
   th: { textAlign: "left", padding: "14px", color: "#0f766e" },
   td: { padding: "14px", fontWeight: "700" },
   deleteButton: { background: "#ef4444", color: "white", border: "none", borderRadius: "999px", padding: "9px 14px", fontWeight: "900", cursor: "pointer" },
