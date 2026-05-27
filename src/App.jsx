@@ -14,6 +14,14 @@ const FALLBACK_WATERS = [
   { id: "fallback-mill-creek", name: "Mill Creek Lake", type: "lake", lat: 39.392, lng: -87.666 },
 ];
 
+const KNOWN_PUBLIC_NAMES = [
+  "Lake Charleston",
+  "Lake Mattoon",
+  "Walnut Point",
+  "Lake Paradise",
+  "Mill Creek",
+];
+
 function getLevelFromXP(xp) {
   return Math.max(1, Math.floor((Number(xp) || 0) / 100) + 1);
 }
@@ -24,9 +32,14 @@ function getXPForNextLevel(xp) {
   return Math.max(0, nextLevelXP - currentXP);
 }
 
-function isPublicMapLocation(pond) {
-  if (!pond) return false;
-  return pond.is_personal === false || String(pond.location || "").includes("near Lake Charleston");
+function looksLikeKnownPublicLocation(pond) {
+  const name = String(pond?.name || "").toLowerCase();
+  const location = String(pond?.location || "").toLowerCase();
+
+  return (
+    location.includes("near lake charleston") ||
+    KNOWN_PUBLIC_NAMES.some((known) => name.includes(known.toLowerCase()))
+  );
 }
 
 export default function App() {
@@ -75,7 +88,7 @@ export default function App() {
   const pondCatches = catches.filter((fish) => fish.pond_id === selectedPondId);
   const pondNotes = notes.filter((item) => item.pond_id === selectedPondId);
 
-  const isPersonalPond = selectedPond && !isPublicMapLocation(selectedPond);
+  const isPersonalPond = selectedPond?.is_personal === true;
   const currentXP = selectedPond?.xp || 0;
   const currentLevel = selectedPond?.level || getLevelFromXP(currentXP);
 
@@ -110,6 +123,29 @@ export default function App() {
     if (tab === "map") fetchNearbyWaters();
   }, [tab, mapRadius]);
 
+  async function normalizeOldPublicLocations(loadedPonds) {
+    const pondsToFix = loadedPonds.filter((pond) => {
+      return pond.is_personal !== false && looksLikeKnownPublicLocation(pond);
+    });
+
+    if (pondsToFix.length === 0) return loadedPonds;
+
+    await Promise.all(
+      pondsToFix.map((pond) =>
+        supabase
+          .from("ponds")
+          .update({ is_personal: false })
+          .eq("id", pond.id)
+      )
+    );
+
+    return loadedPonds.map((pond) =>
+      pondsToFix.some((fixed) => fixed.id === pond.id)
+        ? { ...pond, is_personal: false }
+        : pond
+    );
+  }
+
   async function loadData() {
     const { data: pondData } = await supabase
       .from("ponds")
@@ -134,6 +170,8 @@ export default function App() {
 
       loadedPonds = created ? [created] : [];
     }
+
+    loadedPonds = await normalizeOldPublicLocations(loadedPonds);
 
     setPonds(loadedPonds);
     setSelectedPondId(loadedPonds[0]?.id || "");
@@ -246,7 +284,7 @@ export default function App() {
   }
 
   function calculatePondHealthScore() {
-    if (!selectedPond || isPublicMapLocation(selectedPond)) return null;
+    if (selectedPond?.is_personal !== true) return null;
 
     let score = 55;
     score += Math.min(20, pondCatches.length * 4);
@@ -529,34 +567,15 @@ export default function App() {
         <div style={styles.authCard}>
           <h1 style={styles.authLogo}>🐟 PondPal</h1>
           <h2>{authMode === "login" ? "Log in" : "Create account"}</h2>
-          <p style={{ color: "#64748b", fontWeight: 700 }}>
-            Real login powered by Supabase.
-          </p>
+          <p style={{ color: "#64748b", fontWeight: 700 }}>Real login powered by Supabase.</p>
 
           <form onSubmit={handleAuth} style={styles.authForm}>
             {authMode === "create" && (
-              <input
-                style={styles.input}
-                placeholder="Name"
-                value={authForm.name}
-                onChange={(e) => setAuthForm({ ...authForm, name: e.target.value })}
-              />
+              <input style={styles.input} placeholder="Name" value={authForm.name} onChange={(e) => setAuthForm({ ...authForm, name: e.target.value })} />
             )}
 
-            <input
-              style={styles.input}
-              placeholder="Email"
-              value={authForm.email}
-              onChange={(e) => setAuthForm({ ...authForm, email: e.target.value })}
-            />
-
-            <input
-              style={styles.input}
-              placeholder="Password"
-              type="password"
-              value={authForm.password}
-              onChange={(e) => setAuthForm({ ...authForm, password: e.target.value })}
-            />
+            <input style={styles.input} placeholder="Email" value={authForm.email} onChange={(e) => setAuthForm({ ...authForm, email: e.target.value })} />
+            <input style={styles.input} placeholder="Password" type="password" value={authForm.password} onChange={(e) => setAuthForm({ ...authForm, password: e.target.value })} />
 
             {authError && <p style={styles.error}>{authError}</p>}
 
@@ -565,10 +584,7 @@ export default function App() {
             </button>
           </form>
 
-          <button
-            style={styles.linkButton}
-            onClick={() => setAuthMode(authMode === "login" ? "create" : "login")}
-          >
+          <button style={styles.linkButton} onClick={() => setAuthMode(authMode === "login" ? "create" : "login")}>
             {authMode === "login" ? "Need an account? Create one" : "Already have an account? Log in"}
           </button>
         </div>
@@ -577,14 +593,7 @@ export default function App() {
   }
 
   return (
-    <div
-      style={{
-        ...styles.app,
-        flexDirection: isMobile ? "column" : "row",
-        background: theme.page,
-        color: theme.text,
-      }}
-    >
+    <div style={{ ...styles.app, flexDirection: isMobile ? "column" : "row", background: theme.page, color: theme.text }}>
       <aside
         style={{
           ...styles.sidebar,
@@ -599,17 +608,10 @@ export default function App() {
       >
         <div>
           <h1 style={styles.logo}>🐟 PondPal</h1>
-          <p style={{ ...styles.sidebarSub, color: theme.muted }}>
-            {user.email}
-          </p>
+          <p style={{ ...styles.sidebarSub, color: theme.muted }}>{user.email}</p>
 
           <select
-            style={{
-              ...styles.pondSelect,
-              background: theme.input,
-              color: theme.text,
-              borderColor: theme.border,
-            }}
+            style={{ ...styles.pondSelect, background: theme.input, color: theme.text, borderColor: theme.border }}
             value={selectedPondId}
             onChange={(e) => setSelectedPondId(e.target.value)}
           >
@@ -660,15 +662,7 @@ export default function App() {
         </div>
 
         <div style={{ display: "grid", gap: "10px", marginTop: isMobile ? "14px" : 0 }}>
-          <button
-            style={{
-              ...styles.modeButton,
-              background: theme.card,
-              color: theme.text,
-              borderColor: theme.border,
-            }}
-            onClick={() => setDarkMode(!darkMode)}
-          >
+          <button style={{ ...styles.modeButton, background: theme.card, color: theme.text, borderColor: theme.border }} onClick={() => setDarkMode(!darkMode)}>
             {darkMode ? "☀️ Light Mode" : "🌙 Dark Mode"}
           </button>
 
@@ -692,13 +686,9 @@ export default function App() {
           <>
             <section style={styles.hero}>
               <div>
-                <p style={styles.badge}>
-                  {isPersonalPond ? "Personal Pond" : "Named Public Location"}
-                </p>
+                <p style={styles.badge}>{isPersonalPond ? "Personal Pond" : "Named Public Location"}</p>
 
-                <h2 style={styles.heroTitle}>
-                  {selectedPond?.name || "Your Pond"} is ready.
-                </h2>
+                <h2 style={styles.heroTitle}>{selectedPond?.name || "Your Pond"} is ready.</h2>
 
                 <p style={styles.heroText}>
                   Track catches, upload fish photos, gain XP, level up locations, and build better pond records.
@@ -715,12 +705,8 @@ export default function App() {
                     </div>
 
                     <div style={styles.healthInfoBox}>
-                      <p style={styles.scoreText}>
-                        Pond Health Score is only for personal ponds you add yourself.
-                      </p>
-                      <p style={styles.scoreText}>
-                        It is based on logged catches, saved pond notes, pond level, and whether the pond has a location.
-                      </p>
+                      <p style={styles.scoreText}>Only personal ponds you create in the Ponds tab get a Pond Health Score.</p>
+                      <p style={styles.scoreText}>Score is based on catches, notes, level, and whether you added a location.</p>
                     </div>
                   </>
                 ) : (
@@ -732,12 +718,8 @@ export default function App() {
                     </div>
 
                     <div style={styles.healthInfoBox}>
-                      <p style={styles.scoreText}>
-                        This is a named public location, so it does not get a Pond Health Score.
-                      </p>
-                      <p style={styles.scoreText}>
-                        Public locations use XP and levels from your catches and notes instead.
-                      </p>
+                      <p style={styles.scoreText}>Known map locations do not get a Pond Health Score.</p>
+                      <p style={styles.scoreText}>They only use XP and levels from catches and notes.</p>
                     </div>
                   </>
                 )}
@@ -788,9 +770,7 @@ export default function App() {
             <div style={{ ...styles.resultBox, background: theme.soft }}>
               <h3>Recommended Starter Plan</h3>
               {plan.map((item) => (
-                <p key={item} style={styles.check}>
-                  ✅ {item}
-                </p>
+                <p key={item} style={styles.check}>✅ {item}</p>
               ))}
             </div>
           </Panel>
@@ -807,9 +787,7 @@ export default function App() {
               "Wait before adding bass",
               "Track fish sizes after stocking",
             ].map((item) => (
-              <p key={item} style={styles.check}>
-                ✅ {item}
-              </p>
+              <p key={item} style={styles.check}>✅ {item}</p>
             ))}
           </Panel>
         )}
@@ -817,9 +795,7 @@ export default function App() {
         {tab === "catchlog" && (
           <Panel theme={theme}>
             <h2>Fish Catch Log</h2>
-            <p style={{ color: theme.muted, fontWeight: 800 }}>
-              +25 XP for each catch logged.
-            </p>
+            <p style={{ color: theme.muted, fontWeight: 800 }}>+25 XP for each catch logged.</p>
 
             <form onSubmit={addCatch} style={styles.catchForm}>
               <input placeholder="Species" value={newCatch.species} onChange={(e) => setNewCatch({ ...newCatch, species: e.target.value })} style={{ ...styles.input, background: theme.input, color: theme.text, borderColor: theme.border }} />
@@ -865,32 +841,20 @@ export default function App() {
                 <option value={200}>200 miles</option>
               </select>
 
-              <button style={styles.primaryButton} onClick={fetchNearbyWaters}>
-                Refresh Map
-              </button>
+              <button style={styles.primaryButton} onClick={fetchNearbyWaters}>Refresh Map</button>
             </div>
 
-            {mapLoading && (
-              <p style={{ color: theme.muted, fontWeight: 900 }}>
-                Loading lakes and ponds...
-              </p>
-            )}
-
+            {mapLoading && <p style={{ color: theme.muted, fontWeight: 900 }}>Loading lakes and ponds...</p>}
             {mapError && <p style={styles.error}>{mapError}</p>}
 
             <div style={styles.realMapBox}>
               <MapContainer center={[LAKE_CHARLESTON.lat, LAKE_CHARLESTON.lng]} zoom={8} style={{ height: "100%", width: "100%" }}>
                 <MapUpdater center={LAKE_CHARLESTON} radius={mapRadius} />
 
-                <TileLayer
-                  attribution="&copy; OpenStreetMap contributors"
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                />
+                <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 
                 <CircleMarker center={[LAKE_CHARLESTON.lat, LAKE_CHARLESTON.lng]} radius={12} pathOptions={{ color: "#ef4444", fillColor: "#ef4444", fillOpacity: 0.9 }}>
-                  <Popup>
-                    <strong>Lake Charleston Area</strong>
-                  </Popup>
+                  <Popup><strong>Lake Charleston Area</strong></Popup>
                 </CircleMarker>
 
                 {nearbyWaters.map((water) => (
@@ -900,9 +864,7 @@ export default function App() {
                       <br />
                       {water.type}
                       <br />
-                      <button onClick={() => addWaterAsPond(water)}>
-                        Add to My Ponds
-                      </button>
+                      <button onClick={() => addWaterAsPond(water)}>Add to My Ponds</button>
                     </Popup>
                   </CircleMarker>
                 ))}
@@ -927,17 +889,19 @@ export default function App() {
 
             <div style={styles.grid}>
               {ponds.map((pond) => {
-                const publicLocation = isPublicMapLocation(pond);
+                const personal = pond.is_personal === true;
 
                 return (
                   <div key={pond.id} style={{ ...styles.card, background: theme.card, borderColor: theme.border }}>
-                    <div style={styles.cardEmoji}>{publicLocation ? "📍" : "🌊"}</div>
+                    <div style={styles.cardEmoji}>{personal ? "🌊" : "📍"}</div>
                     <p style={{ ...styles.cardTitle, color: theme.muted }}>
-                      {publicLocation ? "Named Public Location" : "Personal Pond"}
+                      {personal ? "Personal Pond" : "Named Public Location"}
                     </p>
                     <h3 style={styles.cardValue}>{pond.name}</h3>
                     <p style={{ color: theme.muted, fontWeight: 800 }}>{pond.location}</p>
                     <p style={{ fontWeight: 900 }}>Lv. {pond.level || 1} • {pond.xp || 0} XP</p>
+                    {personal && <p style={{ color: theme.muted, fontWeight: 800 }}>Gets Pond Health Score</p>}
+                    {!personal && <p style={{ color: theme.muted, fontWeight: 800 }}>No Pond Health Score</p>}
                     <button style={{ ...styles.deleteButton, marginTop: "16px" }} onClick={() => deletePond(pond.id)}>
                       Delete
                     </button>
@@ -951,9 +915,7 @@ export default function App() {
         {tab === "notes" && (
           <Panel theme={theme}>
             <h2>Pond Notes</h2>
-            <p style={{ color: theme.muted, fontWeight: 800 }}>
-              +10 XP for each note saved.
-            </p>
+            <p style={{ color: theme.muted, fontWeight: 800 }}>+10 XP for each note saved.</p>
 
             <form onSubmit={addNote}>
               <textarea
@@ -993,23 +955,15 @@ export default function App() {
               style={{ ...styles.textarea, background: theme.input, color: theme.text, borderColor: theme.border }}
             />
 
-            <button style={styles.primaryButton} onClick={askPondPal}>
-              Ask PondPal
-            </button>
+            <button style={styles.primaryButton} onClick={askPondPal}>Ask PondPal</button>
 
-            {answer && (
-              <div style={{ ...styles.answer, background: theme.soft }}>
-                {answer}
-              </div>
-            )}
+            {answer && <div style={{ ...styles.answer, background: theme.soft }}>{answer}</div>}
 
             <div style={{ marginTop: "24px" }}>
               <h3>Question History</h3>
 
               {aiHistory.length === 0 && (
-                <p style={{ color: theme.muted, fontWeight: 800 }}>
-                  No questions asked yet.
-                </p>
+                <p style={{ color: theme.muted, fontWeight: 800 }}>No questions asked yet.</p>
               )}
 
               {aiHistory.map((item) => (
