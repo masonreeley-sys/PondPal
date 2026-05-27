@@ -12,6 +12,44 @@ import { supabase } from "./supabase";
 const LAKE_CHARLESTON = { lat: 39.4666, lng: -88.1458 };
 const MILES_TO_METERS = 1609.34;
 
+const FALLBACK_WATERS = [
+  {
+    id: "fallback-lake-charleston",
+    name: "Lake Charleston",
+    type: "lake",
+    lat: 39.4666,
+    lng: -88.1458,
+  },
+  {
+    id: "fallback-lake-mattoon",
+    name: "Lake Mattoon",
+    type: "lake",
+    lat: 39.317,
+    lng: -88.453,
+  },
+  {
+    id: "fallback-walnut-point-lake",
+    name: "Walnut Point Lake",
+    type: "lake",
+    lat: 39.646,
+    lng: -88.057,
+  },
+  {
+    id: "fallback-lake-paradise",
+    name: "Lake Paradise",
+    type: "lake",
+    lat: 39.42,
+    lng: -88.39,
+  },
+  {
+    id: "fallback-mill-creek-lake",
+    name: "Mill Creek Lake",
+    type: "lake",
+    lat: 39.392,
+    lng: -87.666,
+  },
+];
+
 export default function App() {
   const [session, setSession] = useState(null);
   const [authMode, setAuthMode] = useState("login");
@@ -139,25 +177,47 @@ export default function App() {
       const radiusMeters = Math.round(mapRadius * MILES_TO_METERS);
 
       const query = `
-        [out:json][timeout:60];
+        [out:json][timeout:45];
         (
-          node["natural"="water"]["water"~"lake|pond|reservoir"](around:${radiusMeters},${LAKE_CHARLESTON.lat},${LAKE_CHARLESTON.lng});
           way["natural"="water"]["water"~"lake|pond|reservoir"](around:${radiusMeters},${LAKE_CHARLESTON.lat},${LAKE_CHARLESTON.lng});
           relation["natural"="water"]["water"~"lake|pond|reservoir"](around:${radiusMeters},${LAKE_CHARLESTON.lat},${LAKE_CHARLESTON.lng});
         );
-        out center tags;
+        out center tags 250;
       `;
 
-      const response = await fetch("https://overpass-api.de/api/interpreter", {
-        method: "POST",
-        body: query,
-      });
+      const endpoints = [
+        "https://overpass-api.de/api/interpreter",
+        "https://overpass.kumi.systems/api/interpreter",
+        "https://overpass.openstreetmap.ru/api/interpreter",
+      ];
 
-      if (!response.ok) {
-        throw new Error("Map search failed. Try a smaller radius.");
+      let data = null;
+      let lastError = null;
+
+      for (const endpoint of endpoints) {
+        try {
+          const response = await fetch(endpoint, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+            },
+            body: new URLSearchParams({ data: query }),
+          });
+
+          if (!response.ok) {
+            throw new Error(`Overpass server error: ${response.status}`);
+          }
+
+          data = await response.json();
+          break;
+        } catch (err) {
+          lastError = err;
+        }
       }
 
-      const data = await response.json();
+      if (!data) {
+        throw lastError || new Error("Map search failed.");
+      }
 
       const waters = data.elements
         .filter((item) => item.tags?.name)
@@ -165,8 +225,8 @@ export default function App() {
           id: `${item.type}-${item.id}`,
           name: item.tags.name,
           type: item.tags.water || "water",
-          lat: item.lat || item.center?.lat,
-          lng: item.lon || item.center?.lon,
+          lat: item.center?.lat || item.lat,
+          lng: item.center?.lon || item.lon,
         }))
         .filter((item) => item.lat && item.lng);
 
@@ -174,10 +234,20 @@ export default function App() {
         new Map(waters.map((w) => [w.name + w.lat + w.lng, w])).values()
       );
 
+      if (unique.length === 0) {
+        setNearbyWaters(FALLBACK_WATERS);
+        setMapError(
+          "Live lake search found no results, so showing local starter lakes."
+        );
+        return;
+      }
+
       setNearbyWaters(unique);
     } catch (err) {
-      setMapError(err.message);
-      setNearbyWaters([]);
+      setNearbyWaters(FALLBACK_WATERS);
+      setMapError(
+        "Live lake search failed, so showing local starter lakes instead."
+      );
     } finally {
       setMapLoading(false);
     }
@@ -598,76 +668,16 @@ export default function App() {
             </select>
           ) : (
             <nav style={styles.sideNav}>
-              <SideButton
-                label="Dashboard"
-                icon="📊"
-                active={tab === "dashboard"}
-                onClick={() => setTab("dashboard")}
-                theme={theme}
-              />
-              <SideButton
-                label="Stocking Planner"
-                icon="🐟"
-                active={tab === "planner"}
-                onClick={() => setTab("planner")}
-                theme={theme}
-              />
-              <SideButton
-                label="Checklist"
-                icon="✅"
-                active={tab === "checklist"}
-                onClick={() => setTab("checklist")}
-                theme={theme}
-              />
-              <SideButton
-                label="Catch Log"
-                icon="🎣"
-                active={tab === "catchlog"}
-                onClick={() => setTab("catchlog")}
-                theme={theme}
-              />
-              <SideButton
-                label="Records"
-                icon="🏆"
-                active={tab === "records"}
-                onClick={() => setTab("records")}
-                theme={theme}
-              />
-              <SideButton
-                label="Leaderboard"
-                icon="🥇"
-                active={tab === "leaderboard"}
-                onClick={() => setTab("leaderboard")}
-                theme={theme}
-              />
-              <SideButton
-                label="World Map"
-                icon="🗺️"
-                active={tab === "map"}
-                onClick={() => setTab("map")}
-                theme={theme}
-              />
-              <SideButton
-                label="Ponds"
-                icon="🌊"
-                active={tab === "ponds"}
-                onClick={() => setTab("ponds")}
-                theme={theme}
-              />
-              <SideButton
-                label="Pond Notes"
-                icon="📝"
-                active={tab === "notes"}
-                onClick={() => setTab("notes")}
-                theme={theme}
-              />
-              <SideButton
-                label="Ask PondPal"
-                icon="💬"
-                active={tab === "ask"}
-                onClick={() => setTab("ask")}
-                theme={theme}
-              />
+              <SideButton label="Dashboard" icon="📊" active={tab === "dashboard"} onClick={() => setTab("dashboard")} theme={theme} />
+              <SideButton label="Stocking Planner" icon="🐟" active={tab === "planner"} onClick={() => setTab("planner")} theme={theme} />
+              <SideButton label="Checklist" icon="✅" active={tab === "checklist"} onClick={() => setTab("checklist")} theme={theme} />
+              <SideButton label="Catch Log" icon="🎣" active={tab === "catchlog"} onClick={() => setTab("catchlog")} theme={theme} />
+              <SideButton label="Records" icon="🏆" active={tab === "records"} onClick={() => setTab("records")} theme={theme} />
+              <SideButton label="Leaderboard" icon="🥇" active={tab === "leaderboard"} onClick={() => setTab("leaderboard")} theme={theme} />
+              <SideButton label="World Map" icon="🗺️" active={tab === "map"} onClick={() => setTab("map")} theme={theme} />
+              <SideButton label="Ponds" icon="🌊" active={tab === "ponds"} onClick={() => setTab("ponds")} theme={theme} />
+              <SideButton label="Pond Notes" icon="📝" active={tab === "notes"} onClick={() => setTab("notes")} theme={theme} />
+              <SideButton label="Ask PondPal" icon="💬" active={tab === "ask"} onClick={() => setTab("ask")} theme={theme} />
             </nav>
           )}
         </div>
@@ -731,30 +741,10 @@ export default function App() {
             </section>
 
             <section style={styles.grid}>
-              <Card
-                title="Logged Catches"
-                value={String(pondCatches.length)}
-                emoji="🎣"
-                theme={theme}
-              />
-              <Card
-                title="Personal Records"
-                value={String(personalRecords.length)}
-                emoji="🏆"
-                theme={theme}
-              />
-              <Card
-                title="Map Waters"
-                value={String(nearbyWaters.length)}
-                emoji="🗺️"
-                theme={theme}
-              />
-              <Card
-                title="AI Questions"
-                value={String(aiHistory.length)}
-                emoji="💬"
-                theme={theme}
-              />
+              <Card title="Logged Catches" value={String(pondCatches.length)} emoji="🎣" theme={theme} />
+              <Card title="Personal Records" value={String(personalRecords.length)} emoji="🏆" theme={theme} />
+              <Card title="Map Waters" value={String(nearbyWaters.length)} emoji="🗺️" theme={theme} />
+              <Card title="AI Questions" value={String(aiHistory.length)} emoji="💬" theme={theme} />
             </section>
           </>
         )}
@@ -827,96 +817,16 @@ export default function App() {
             <h2>Fish Catch Log</h2>
 
             <form onSubmit={addCatch} style={styles.catchForm}>
-              <input
-                placeholder="Species"
-                value={newCatch.species}
-                onChange={(e) =>
-                  setNewCatch({ ...newCatch, species: e.target.value })
-                }
-                style={{
-                  ...styles.input,
-                  background: theme.input,
-                  color: theme.text,
-                  borderColor: theme.border,
-                }}
-              />
-              <input
-                placeholder="Length inches"
-                value={newCatch.length}
-                onChange={(e) =>
-                  setNewCatch({ ...newCatch, length: e.target.value })
-                }
-                style={{
-                  ...styles.input,
-                  background: theme.input,
-                  color: theme.text,
-                  borderColor: theme.border,
-                }}
-              />
-              <input
-                placeholder="Weight lbs"
-                value={newCatch.weight}
-                onChange={(e) =>
-                  setNewCatch({ ...newCatch, weight: e.target.value })
-                }
-                style={{
-                  ...styles.input,
-                  background: theme.input,
-                  color: theme.text,
-                  borderColor: theme.border,
-                }}
-              />
-              <input
-                placeholder="Location"
-                value={newCatch.location}
-                onChange={(e) =>
-                  setNewCatch({ ...newCatch, location: e.target.value })
-                }
-                style={{
-                  ...styles.input,
-                  background: theme.input,
-                  color: theme.text,
-                  borderColor: theme.border,
-                }}
-              />
-              <input
-                type="date"
-                value={newCatch.caught_at}
-                onChange={(e) =>
-                  setNewCatch({ ...newCatch, caught_at: e.target.value })
-                }
-                style={{
-                  ...styles.input,
-                  background: theme.input,
-                  color: theme.text,
-                  borderColor: theme.border,
-                }}
-              />
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) =>
-                  setNewCatch({
-                    ...newCatch,
-                    photoFile: e.target.files[0],
-                  })
-                }
-                style={{
-                  ...styles.input,
-                  background: theme.input,
-                  color: theme.text,
-                  borderColor: theme.border,
-                }}
-              />
+              <input placeholder="Species" value={newCatch.species} onChange={(e) => setNewCatch({ ...newCatch, species: e.target.value })} style={{ ...styles.input, background: theme.input, color: theme.text, borderColor: theme.border }} />
+              <input placeholder="Length inches" value={newCatch.length} onChange={(e) => setNewCatch({ ...newCatch, length: e.target.value })} style={{ ...styles.input, background: theme.input, color: theme.text, borderColor: theme.border }} />
+              <input placeholder="Weight lbs" value={newCatch.weight} onChange={(e) => setNewCatch({ ...newCatch, weight: e.target.value })} style={{ ...styles.input, background: theme.input, color: theme.text, borderColor: theme.border }} />
+              <input placeholder="Location" value={newCatch.location} onChange={(e) => setNewCatch({ ...newCatch, location: e.target.value })} style={{ ...styles.input, background: theme.input, color: theme.text, borderColor: theme.border }} />
+              <input type="date" value={newCatch.caught_at} onChange={(e) => setNewCatch({ ...newCatch, caught_at: e.target.value })} style={{ ...styles.input, background: theme.input, color: theme.text, borderColor: theme.border }} />
+              <input type="file" accept="image/*" onChange={(e) => setNewCatch({ ...newCatch, photoFile: e.target.files[0] })} style={{ ...styles.input, background: theme.input, color: theme.text, borderColor: theme.border }} />
               <button style={styles.primaryButton}>Add Catch</button>
             </form>
 
-            <RecordTable
-              rows={pondCatches}
-              theme={theme}
-              deleteCatch={deleteCatch}
-              showAction
-            />
+            <RecordTable rows={pondCatches} theme={theme} deleteCatch={deleteCatch} showAction />
           </Panel>
         )}
 
@@ -1032,32 +942,8 @@ export default function App() {
             <h2>Manage Ponds</h2>
 
             <form onSubmit={addPond} style={styles.catchForm}>
-              <input
-                placeholder="Pond name"
-                value={newPond.name}
-                onChange={(e) =>
-                  setNewPond({ ...newPond, name: e.target.value })
-                }
-                style={{
-                  ...styles.input,
-                  background: theme.input,
-                  color: theme.text,
-                  borderColor: theme.border,
-                }}
-              />
-              <input
-                placeholder="Location"
-                value={newPond.location}
-                onChange={(e) =>
-                  setNewPond({ ...newPond, location: e.target.value })
-                }
-                style={{
-                  ...styles.input,
-                  background: theme.input,
-                  color: theme.text,
-                  borderColor: theme.border,
-                }}
-              />
+              <input placeholder="Pond name" value={newPond.name} onChange={(e) => setNewPond({ ...newPond, name: e.target.value })} style={{ ...styles.input, background: theme.input, color: theme.text, borderColor: theme.border }} />
+              <input placeholder="Location" value={newPond.location} onChange={(e) => setNewPond({ ...newPond, location: e.target.value })} style={{ ...styles.input, background: theme.input, color: theme.text, borderColor: theme.border }} />
               <button style={styles.primaryButton}>Add Pond</button>
             </form>
 
