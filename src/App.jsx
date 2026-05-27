@@ -87,7 +87,7 @@ export default function App() {
   const [answer, setAnswer] = useState("");
   const [aiHistory, setAiHistory] = useState([]);
 
-  const [mapRadius, setMapRadius] = useState(50);
+  const [mapRadius, setMapRadius] = useState(25);
   const [nearbyWaters, setNearbyWaters] = useState([]);
   const [mapLoading, setMapLoading] = useState(false);
   const [mapError, setMapError] = useState("");
@@ -177,12 +177,12 @@ export default function App() {
       const radiusMeters = Math.round(mapRadius * MILES_TO_METERS);
 
       const query = `
-        [out:json][timeout:45];
+        [out:json][timeout:35];
         (
           way["natural"="water"]["water"~"lake|pond|reservoir"](around:${radiusMeters},${LAKE_CHARLESTON.lat},${LAKE_CHARLESTON.lng});
           relation["natural"="water"]["water"~"lake|pond|reservoir"](around:${radiusMeters},${LAKE_CHARLESTON.lat},${LAKE_CHARLESTON.lng});
         );
-        out center tags 250;
+        out center tags 100;
       `;
 
       const endpoints = [
