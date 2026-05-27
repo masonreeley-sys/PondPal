@@ -24,6 +24,11 @@ function getXPForNextLevel(xp) {
   return Math.max(0, nextLevelXP - currentXP);
 }
 
+function isPublicMapLocation(pond) {
+  if (!pond) return false;
+  return pond.is_personal === false || String(pond.location || "").includes("near Lake Charleston");
+}
+
 export default function App() {
   const [session, setSession] = useState(null);
   const [authMode, setAuthMode] = useState("login");
@@ -70,7 +75,7 @@ export default function App() {
   const pondCatches = catches.filter((fish) => fish.pond_id === selectedPondId);
   const pondNotes = notes.filter((item) => item.pond_id === selectedPondId);
 
-  const isPersonalPond = selectedPond?.is_personal !== false;
+  const isPersonalPond = selectedPond && !isPublicMapLocation(selectedPond);
   const currentXP = selectedPond?.xp || 0;
   const currentLevel = selectedPond?.level || getLevelFromXP(currentXP);
 
@@ -241,7 +246,7 @@ export default function App() {
   }
 
   function calculatePondHealthScore() {
-    if (!selectedPond || selectedPond.is_personal === false) return null;
+    if (!selectedPond || isPublicMapLocation(selectedPond)) return null;
 
     let score = 55;
     score += Math.min(20, pondCatches.length * 4);
@@ -708,9 +713,15 @@ export default function App() {
                     <div style={styles.progressBack}>
                       <div style={{ ...styles.progressFill, width: `${pondHealthScore}%` }} />
                     </div>
-                    <p style={styles.scoreText}>
-                      Based on catches, notes, level, and activity.
-                    </p>
+
+                    <div style={styles.healthInfoBox}>
+                      <p style={styles.scoreText}>
+                        Pond Health Score is only for personal ponds you add yourself.
+                      </p>
+                      <p style={styles.scoreText}>
+                        It is based on logged catches, saved pond notes, pond level, and whether the pond has a location.
+                      </p>
+                    </div>
                   </>
                 ) : (
                   <>
@@ -719,9 +730,15 @@ export default function App() {
                     <div style={styles.progressBack}>
                       <div style={{ ...styles.progressFill, width: `${currentXP % 100}%` }} />
                     </div>
-                    <p style={styles.scoreText}>
-                      Public locations use XP and levels, not pond health score.
-                    </p>
+
+                    <div style={styles.healthInfoBox}>
+                      <p style={styles.scoreText}>
+                        This is a named public location, so it does not get a Pond Health Score.
+                      </p>
+                      <p style={styles.scoreText}>
+                        Public locations use XP and levels from your catches and notes instead.
+                      </p>
+                    </div>
                   </>
                 )}
               </div>
@@ -909,20 +926,24 @@ export default function App() {
             </form>
 
             <div style={styles.grid}>
-              {ponds.map((pond) => (
-                <div key={pond.id} style={{ ...styles.card, background: theme.card, borderColor: theme.border }}>
-                  <div style={styles.cardEmoji}>{pond.is_personal === false ? "📍" : "🌊"}</div>
-                  <p style={{ ...styles.cardTitle, color: theme.muted }}>
-                    {pond.is_personal === false ? "Named Public Location" : "Personal Pond"}
-                  </p>
-                  <h3 style={styles.cardValue}>{pond.name}</h3>
-                  <p style={{ color: theme.muted, fontWeight: 800 }}>{pond.location}</p>
-                  <p style={{ fontWeight: 900 }}>Lv. {pond.level || 1} • {pond.xp || 0} XP</p>
-                  <button style={{ ...styles.deleteButton, marginTop: "16px" }} onClick={() => deletePond(pond.id)}>
-                    Delete
-                  </button>
-                </div>
-              ))}
+              {ponds.map((pond) => {
+                const publicLocation = isPublicMapLocation(pond);
+
+                return (
+                  <div key={pond.id} style={{ ...styles.card, background: theme.card, borderColor: theme.border }}>
+                    <div style={styles.cardEmoji}>{publicLocation ? "📍" : "🌊"}</div>
+                    <p style={{ ...styles.cardTitle, color: theme.muted }}>
+                      {publicLocation ? "Named Public Location" : "Personal Pond"}
+                    </p>
+                    <h3 style={styles.cardValue}>{pond.name}</h3>
+                    <p style={{ color: theme.muted, fontWeight: 800 }}>{pond.location}</p>
+                    <p style={{ fontWeight: 900 }}>Lv. {pond.level || 1} • {pond.xp || 0} XP</p>
+                    <button style={{ ...styles.deleteButton, marginTop: "16px" }} onClick={() => deletePond(pond.id)}>
+                      Delete
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </Panel>
         )}
@@ -1215,7 +1236,8 @@ const styles = {
   scoreCard: { background: "rgba(255,255,255,.15)", borderRadius: "28px", padding: "24px" },
   scoreLabel: { margin: 0, opacity: 0.8, fontWeight: 700 },
   score: { fontSize: "64px", margin: "10px 0" },
-  scoreText: { fontWeight: 800, lineHeight: 1.4 },
+  scoreText: { fontWeight: 800, lineHeight: 1.4, margin: 0 },
+  healthInfoBox: { marginTop: "14px", display: "grid", gap: "8px" },
   progressBack: { background: "rgba(255,255,255,.25)", height: "12px", borderRadius: "999px", overflow: "hidden" },
   progressFill: { background: "#bef264", height: "100%" },
 
