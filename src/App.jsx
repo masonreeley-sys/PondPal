@@ -662,6 +662,7 @@ export default function App() {
         style={{
           ...styles.sidebar,
           width: isMobile ? "100%" : "285px",
+          minWidth: isMobile ? "100%" : "285px",
           height: isMobile ? "auto" : "100vh",
           position: isMobile ? "relative" : "sticky",
           borderRight: isMobile ? "none" : "1px solid",
@@ -751,9 +752,7 @@ export default function App() {
             <section style={styles.hero}>
               <div>
                 <p style={styles.badge}>{isPersonalPond ? "Personal Pond" : "Named Public Location"}</p>
-
                 <h2 style={styles.heroTitle}>{selectedPond?.name || "Your Pond"} is ready.</h2>
-
                 <p style={styles.heroText}>
                   Track catches, upload fish photos, gain XP, level up locations, and build better pond records.
                 </p>
@@ -767,7 +766,6 @@ export default function App() {
                     <div style={styles.progressBack}>
                       <div style={{ ...styles.progressFill, width: `${pondHealthScore}%` }} />
                     </div>
-
                     <div style={styles.healthInfoBox}>
                       <p style={styles.scoreText}>Only personal ponds you create in the Ponds tab get a Pond Health Score.</p>
                       <p style={styles.scoreText}>Score is based on catches, notes, level, and whether you added a location.</p>
@@ -780,7 +778,6 @@ export default function App() {
                     <div style={styles.progressBack}>
                       <div style={{ ...styles.progressFill, width: `${currentXP % 100}%` }} />
                     </div>
-
                     <div style={styles.healthInfoBox}>
                       <p style={styles.scoreText}>Known map locations do not get a Pond Health Score.</p>
                       <p style={styles.scoreText}>They only use XP and levels from catches and notes.</p>
@@ -804,7 +801,6 @@ export default function App() {
         {tab === "planner" && (
           <Panel theme={theme}>
             <h2>Stocking Planner</h2>
-
             {!isPersonalPond && (
               <p style={{ color: theme.muted, fontWeight: 800 }}>
                 This is a named public location. Stocking plans are mainly for personal ponds.
@@ -812,20 +808,10 @@ export default function App() {
             )}
 
             <label style={styles.label}>Pond size in acres</label>
-            <input
-              style={{ ...styles.input, background: theme.input, color: theme.text, borderColor: theme.border }}
-              type="number"
-              step="0.05"
-              value={pondSize}
-              onChange={(e) => setPondSize(e.target.value)}
-            />
+            <input style={{ ...styles.input, background: theme.input, color: theme.text, borderColor: theme.border }} type="number" step="0.05" value={pondSize} onChange={(e) => setPondSize(e.target.value)} />
 
             <label style={styles.label}>Main goal</label>
-            <select
-              style={{ ...styles.input, background: theme.input, color: theme.text, borderColor: theme.border }}
-              value={goal}
-              onChange={(e) => setGoal(e.target.value)}
-            >
+            <select style={{ ...styles.input, background: theme.input, color: theme.text, borderColor: theme.border }} value={goal} onChange={(e) => setGoal(e.target.value)}>
               <option value="balanced">Balanced fishing pond</option>
               <option value="minnows">Build minnows first</option>
               <option value="bass">Bass fishing</option>
@@ -833,9 +819,7 @@ export default function App() {
 
             <div style={{ ...styles.resultBox, background: theme.soft }}>
               <h3>Recommended Starter Plan</h3>
-              {plan.map((item) => (
-                <p key={item} style={styles.check}>✅ {item}</p>
-              ))}
+              {plan.map((item) => <p key={item} style={styles.check}>✅ {item}</p>)}
             </div>
           </Panel>
         )}
@@ -850,9 +834,7 @@ export default function App() {
               "Stock forage fish first",
               "Wait before adding bass",
               "Track fish sizes after stocking",
-            ].map((item) => (
-              <p key={item} style={styles.check}>✅ {item}</p>
-            ))}
+            ].map((item) => <p key={item} style={styles.check}>✅ {item}</p>)}
           </Panel>
         )}
 
@@ -912,17 +894,12 @@ export default function App() {
             <h2>Waters Within {mapRadius} Miles of Lake Charleston</h2>
 
             <div style={styles.mapControls}>
-              <select
-                style={{ ...styles.input, background: theme.input, color: theme.text, borderColor: theme.border }}
-                value={mapRadius}
-                onChange={(e) => setMapRadius(Number(e.target.value))}
-              >
+              <select style={{ ...styles.input, background: theme.input, color: theme.text, borderColor: theme.border }} value={mapRadius} onChange={(e) => setMapRadius(Number(e.target.value))}>
                 <option value={25}>25 miles</option>
                 <option value={50}>50 miles</option>
                 <option value={100}>100 miles</option>
                 <option value={200}>200 miles</option>
               </select>
-
               <button style={styles.primaryButton} onClick={fetchNearbyWaters}>Refresh Map</button>
             </div>
 
@@ -932,13 +909,10 @@ export default function App() {
             <div style={styles.realMapBox}>
               <MapContainer center={[LAKE_CHARLESTON.lat, LAKE_CHARLESTON.lng]} zoom={8} style={{ height: "100%", width: "100%" }}>
                 <MapUpdater center={LAKE_CHARLESTON} radius={mapRadius} />
-
                 <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-
                 <CircleMarker center={[LAKE_CHARLESTON.lat, LAKE_CHARLESTON.lng]} radius={12} pathOptions={{ color: "#ef4444", fillColor: "#ef4444", fillOpacity: 0.9 }}>
                   <Popup><strong>Lake Charleston Area</strong></Popup>
                 </CircleMarker>
-
                 {nearbyWaters.map((water) => (
                   <CircleMarker key={water.id} center={[water.lat, water.lng]} radius={8} pathOptions={{ color: "#0f766e", fillColor: "#22c55e", fillOpacity: 0.8 }}>
                     <Popup>
@@ -976,9 +950,7 @@ export default function App() {
                 return (
                   <div key={pond.id} style={{ ...styles.card, background: theme.card, borderColor: theme.border }}>
                     <div style={styles.cardEmoji}>{personal ? "🌊" : "📍"}</div>
-                    <p style={{ ...styles.cardTitle, color: theme.muted }}>
-                      {personal ? "Personal Pond" : "Named Public Location"}
-                    </p>
+                    <p style={{ ...styles.cardTitle, color: theme.muted }}>{personal ? "Personal Pond" : "Named Public Location"}</p>
                     <h3 style={styles.cardValue}>{pond.name}</h3>
                     <p style={{ color: theme.muted, fontWeight: 800 }}>{pond.location}</p>
                     <p style={{ fontWeight: 900 }}>Lv. {pond.level || 1} • {pond.xp || 0} XP</p>
@@ -1000,12 +972,7 @@ export default function App() {
             <p style={{ color: theme.muted, fontWeight: 800 }}>+10 XP for each note saved.</p>
 
             <form onSubmit={addNote}>
-              <textarea
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder="Write a pond note..."
-                style={{ ...styles.textarea, background: theme.input, color: theme.text, borderColor: theme.border }}
-              />
+              <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Write a pond note..." style={{ ...styles.textarea, background: theme.input, color: theme.text, borderColor: theme.border }} />
               <button style={styles.primaryButton}>Save Note</button>
             </form>
 
@@ -1016,7 +983,6 @@ export default function App() {
                     <strong>{new Date(item.created_at).toLocaleDateString()}</strong>
                     <p>{item.note}</p>
                   </div>
-
                   <button style={styles.deleteButton} onClick={() => deleteNote(item.id)}>
                     Delete
                   </button>
@@ -1029,25 +995,14 @@ export default function App() {
         {tab === "ask" && (
           <Panel theme={theme}>
             <h2>Ask PondPal</h2>
-
-            <textarea
-              value={question}
-              onChange={(e) => setQuestion(e.target.value)}
-              placeholder="Ask a pond question..."
-              style={{ ...styles.textarea, background: theme.input, color: theme.text, borderColor: theme.border }}
-            />
-
+            <textarea value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="Ask a pond question..." style={{ ...styles.textarea, background: theme.input, color: theme.text, borderColor: theme.border }} />
             <button style={styles.primaryButton} onClick={askPondPal}>Ask PondPal</button>
 
             {answer && <div style={{ ...styles.answer, background: theme.soft }}>{answer}</div>}
 
             <div style={{ marginTop: "24px" }}>
               <h3>Question History</h3>
-
-              {aiHistory.length === 0 && (
-                <p style={{ color: theme.muted, fontWeight: 800 }}>No questions asked yet.</p>
-              )}
-
+              {aiHistory.length === 0 && <p style={{ color: theme.muted, fontWeight: 800 }}>No questions asked yet.</p>}
               {aiHistory.map((item) => (
                 <div key={item.id} style={{ ...styles.noteCard, background: theme.soft, borderColor: theme.border, marginBottom: "12px" }}>
                   <div>
@@ -1157,7 +1112,14 @@ function RecordTable({ rows, theme, deleteCatch, showAction = false }) {
             <tr key={fish.id} style={{ borderTop: `1px solid ${theme.border}` }}>
               <td style={styles.td}>
                 {fish.photo_url ? (
-                  <img src={fish.photo_url} alt={fish.species} style={styles.catchPhoto} />
+                  <img
+                    src={fish.photo_url}
+                    alt={fish.species}
+                    style={styles.catchPhoto}
+                    onError={(e) => {
+                      e.currentTarget.src = "https://placehold.co/100x100/0f172a/ffffff?text=Fish";
+                    }}
+                  />
                 ) : (
                   "-"
                 )}
@@ -1217,9 +1179,7 @@ function LeaderboardTable({ rows, theme }) {
         <tbody>
           {rows.map((fish, index) => (
             <tr key={fish.id} style={{ borderTop: `1px solid ${theme.border}` }}>
-              <td style={styles.td}>
-                {index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : `#${index + 1}`}
-              </td>
+              <td style={styles.td}>{index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : `#${index + 1}`}</td>
               <td style={styles.td}>{fish.species}</td>
               <td style={styles.td}>{fish.weight ? `${fish.weight} lb` : "-"}</td>
               <td style={styles.td}>{fish.length ? `${fish.length} in` : "-"}</td>
@@ -1264,7 +1224,21 @@ const styles = {
   linkButton: { border: "none", background: "transparent", color: "#0f766e", fontWeight: 900, cursor: "pointer", marginTop: "16px" },
 
   app: { minHeight: "100vh", display: "flex", fontFamily: "Arial, sans-serif" },
-  sidebar: { width: "285px", padding: "20px", borderRight: "1px solid", display: "flex", flexDirection: "column", justifyContent: "space-between", position: "sticky", top: 0, height: "100vh", boxSizing: "border-box", overflowY: "auto" },
+  sidebar: {
+    width: "285px",
+    minWidth: "285px",
+    flexShrink: 0,
+    padding: "20px",
+    borderRight: "1px solid",
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "space-between",
+    position: "sticky",
+    top: 0,
+    height: "100vh",
+    boxSizing: "border-box",
+    overflowY: "auto",
+  },
   logo: { fontSize: "30px", margin: 0 },
   sidebarSub: { marginTop: "6px", fontWeight: 700, fontSize: "13px", wordBreak: "break-word" },
   pondSelect: { width: "100%", marginTop: "14px", padding: "12px", borderRadius: "16px", border: "1px solid", fontWeight: 800 },
@@ -1314,7 +1288,7 @@ const styles = {
   th: { textAlign: "left", padding: "14px", color: "#0f766e" },
   td: { padding: "14px", fontWeight: "700" },
   deleteButton: { background: "#ef4444", color: "white", border: "none", borderRadius: "999px", padding: "9px 14px", fontWeight: "900", cursor: "pointer" },
-  catchPhoto: { width: "70px", height: "70px", objectFit: "cover", borderRadius: "14px" },
+  catchPhoto: { width: "90px", height: "90px", objectFit: "cover", borderRadius: "14px" },
 
   mapControls: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px", marginBottom: "16px" },
   realMapBox: { height: "min(70vh, 560px)", minHeight: "420px", borderRadius: "24px", overflow: "hidden", border: "1px solid #dbeafe" },
