@@ -49,7 +49,9 @@ export default function App() {
   const [authError, setAuthError] = useState("");
 
   const [tab, setTab] = useState("dashboard");
-  const [darkMode, setDarkMode] = useState(() => JSON.parse(localStorage.getItem("pondpal-dark") || "false"));
+  const [darkMode, setDarkMode] = useState(() =>
+    JSON.parse(localStorage.getItem("pondpal-dark") || "false")
+  );
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   const [ponds, setPonds] = useState([]);
@@ -465,7 +467,7 @@ export default function App() {
         result = JSON.parse(rawText);
       } catch {
         throw new Error(
-          "The fish identifier backend did not return JSON. This usually means the Vercel API route crashed or is not deployed. Response started with: " +
+          "The fish identifier backend did not return JSON. Response started with: " +
             rawText.slice(0, 160)
         );
       }
@@ -646,11 +648,28 @@ export default function App() {
 
           <form onSubmit={handleAuth} style={styles.authForm}>
             {authMode === "create" && (
-              <input style={styles.input} placeholder="Name" value={authForm.name} onChange={(e) => setAuthForm({ ...authForm, name: e.target.value })} />
+              <input
+                style={styles.input}
+                placeholder="Name"
+                value={authForm.name}
+                onChange={(e) => setAuthForm({ ...authForm, name: e.target.value })}
+              />
             )}
 
-            <input style={styles.input} placeholder="Email" value={authForm.email} onChange={(e) => setAuthForm({ ...authForm, email: e.target.value })} />
-            <input style={styles.input} placeholder="Password" type="password" value={authForm.password} onChange={(e) => setAuthForm({ ...authForm, password: e.target.value })} />
+            <input
+              style={styles.input}
+              placeholder="Email"
+              value={authForm.email}
+              onChange={(e) => setAuthForm({ ...authForm, email: e.target.value })}
+            />
+
+            <input
+              style={styles.input}
+              placeholder="Password"
+              type="password"
+              value={authForm.password}
+              onChange={(e) => setAuthForm({ ...authForm, password: e.target.value })}
+            />
 
             {authError && <p style={styles.error}>{authError}</p>}
 
@@ -659,7 +678,10 @@ export default function App() {
             </button>
           </form>
 
-          <button style={styles.linkButton} onClick={() => setAuthMode(authMode === "login" ? "create" : "login")}>
+          <button
+            style={styles.linkButton}
+            onClick={() => setAuthMode(authMode === "login" ? "create" : "login")}
+          >
             {authMode === "login" ? "Need an account? Create one" : "Already have an account? Log in"}
           </button>
         </div>
@@ -738,7 +760,10 @@ export default function App() {
         </div>
 
         <div style={{ display: "grid", gap: "10px", marginTop: isMobile ? "14px" : 0 }}>
-          <button style={{ ...styles.modeButton, background: theme.card, color: theme.text, borderColor: theme.border }} onClick={() => setDarkMode(!darkMode)}>
+          <button
+            style={{ ...styles.modeButton, background: theme.card, color: theme.text, borderColor: theme.border }}
+            onClick={() => setDarkMode(!darkMode)}
+          >
             {darkMode ? "☀️ Light Mode" : "🌙 Dark Mode"}
           </button>
 
@@ -819,10 +844,20 @@ export default function App() {
             )}
 
             <label style={styles.label}>Pond size in acres</label>
-            <input style={{ ...styles.input, background: theme.input, color: theme.text, borderColor: theme.border }} type="number" step="0.05" value={pondSize} onChange={(e) => setPondSize(e.target.value)} />
+            <input
+              style={{ ...styles.input, background: theme.input, color: theme.text, borderColor: theme.border }}
+              type="number"
+              step="0.05"
+              value={pondSize}
+              onChange={(e) => setPondSize(e.target.value)}
+            />
 
             <label style={styles.label}>Main goal</label>
-            <select style={{ ...styles.input, background: theme.input, color: theme.text, borderColor: theme.border }} value={goal} onChange={(e) => setGoal(e.target.value)}>
+            <select
+              style={{ ...styles.input, background: theme.input, color: theme.text, borderColor: theme.border }}
+              value={goal}
+              onChange={(e) => setGoal(e.target.value)}
+            >
               <option value="balanced">Balanced fishing pond</option>
               <option value="minnows">Build minnows first</option>
               <option value="bass">Bass fishing</option>
@@ -830,7 +865,11 @@ export default function App() {
 
             <div style={{ ...styles.resultBox, background: theme.soft }}>
               <h3>Recommended Starter Plan</h3>
-              {plan.map((item) => <p key={item} style={styles.check}>✅ {item}</p>)}
+              {plan.map((item) => (
+                <p key={item} style={styles.check}>
+                  ✅ {item}
+                </p>
+              ))}
             </div>
           </Panel>
         )}
@@ -845,7 +884,11 @@ export default function App() {
               "Stock forage fish first",
               "Wait before adding bass",
               "Track fish sizes after stocking",
-            ].map((item) => <p key={item} style={styles.check}>✅ {item}</p>)}
+            ].map((item) => (
+              <p key={item} style={styles.check}>
+                ✅ {item}
+              </p>
+            ))}
           </Panel>
         )}
 
@@ -896,15 +939,39 @@ export default function App() {
             </form>
 
             {(newCatch.ai_species || newCatch.estimate_notes) && (
-              <div style={{ ...styles.aiResultBox, background: theme.soft, borderColor: theme.border }}>
-                <h3>AI Fish ID</h3>
-                <p><b>Species:</b> {newCatch.ai_species || "Unknown"}</p>
-                <p><b>Confidence:</b> {newCatch.ai_confidence ?? 0}%</p>
-                <p><b>Estimated Length:</b> {newCatch.estimated_length ? `${newCatch.estimated_length} in` : "No reliable estimate"}</p>
-                <p><b>Notes:</b> {newCatch.estimate_notes || "No notes."}</p>
-                <p style={{ color: theme.muted, fontWeight: 800 }}>
-                  AI can be wrong. Confirm species and size before saving.
-                </p>
+              <div
+                style={{
+                  ...styles.compactAiResult,
+                  background: theme.soft,
+                  borderColor: theme.border,
+                  color: theme.text,
+                }}
+              >
+                <div>
+                  <strong>AI Fish ID:</strong>{" "}
+                  {newCatch.ai_species || "Unknown"}{" "}
+                  <span style={{ color: theme.muted }}>
+                    ({newCatch.ai_confidence ?? 0}%)
+                  </span>
+                </div>
+
+                <div style={styles.aiPill}>
+                  {newCatch.estimated_length
+                    ? `${newCatch.estimated_length} in estimate`
+                    : "No size estimate"}
+                </div>
+
+                <details style={{ gridColumn: "1 / -1" }}>
+                  <summary style={{ cursor: "pointer", fontWeight: 800 }}>
+                    Notes
+                  </summary>
+                  <p style={{ marginBottom: 0 }}>
+                    {newCatch.estimate_notes || "No notes."}
+                  </p>
+                  <p style={{ color: theme.muted, fontWeight: 800 }}>
+                    AI can be wrong. Confirm species and size before saving.
+                  </p>
+                </details>
               </div>
             )}
 
@@ -931,7 +998,11 @@ export default function App() {
             <h2>Waters Within {mapRadius} Miles of Lake Charleston</h2>
 
             <div style={styles.mapControls}>
-              <select style={{ ...styles.input, background: theme.input, color: theme.text, borderColor: theme.border }} value={mapRadius} onChange={(e) => setMapRadius(Number(e.target.value))}>
+              <select
+                style={{ ...styles.input, background: theme.input, color: theme.text, borderColor: theme.border }}
+                value={mapRadius}
+                onChange={(e) => setMapRadius(Number(e.target.value))}
+              >
                 <option value={25}>25 miles</option>
                 <option value={50}>50 miles</option>
                 <option value={100}>100 miles</option>
@@ -947,9 +1018,11 @@ export default function App() {
               <MapContainer center={[LAKE_CHARLESTON.lat, LAKE_CHARLESTON.lng]} zoom={8} style={{ height: "100%", width: "100%" }}>
                 <MapUpdater center={LAKE_CHARLESTON} radius={mapRadius} />
                 <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+
                 <CircleMarker center={[LAKE_CHARLESTON.lat, LAKE_CHARLESTON.lng]} radius={12} pathOptions={{ color: "#ef4444", fillColor: "#ef4444", fillOpacity: 0.9 }}>
                   <Popup><strong>Lake Charleston Area</strong></Popup>
                 </CircleMarker>
+
                 {nearbyWaters.map((water) => (
                   <CircleMarker key={water.id} center={[water.lat, water.lng]} radius={8} pathOptions={{ color: "#0f766e", fillColor: "#22c55e", fillOpacity: 0.8 }}>
                     <Popup>
@@ -1009,7 +1082,12 @@ export default function App() {
             <p style={{ color: theme.muted, fontWeight: 800 }}>+10 XP for each note saved.</p>
 
             <form onSubmit={addNote}>
-              <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Write a pond note..." style={{ ...styles.textarea, background: theme.input, color: theme.text, borderColor: theme.border }} />
+              <textarea
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="Write a pond note..."
+                style={{ ...styles.textarea, background: theme.input, color: theme.text, borderColor: theme.border }}
+              />
               <button style={styles.primaryButton}>Save Note</button>
             </form>
 
@@ -1032,7 +1110,12 @@ export default function App() {
         {tab === "ask" && (
           <Panel theme={theme}>
             <h2>Ask PondPal</h2>
-            <textarea value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="Ask a pond question..." style={{ ...styles.textarea, background: theme.input, color: theme.text, borderColor: theme.border }} />
+            <textarea
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              placeholder="Ask a pond question..."
+              style={{ ...styles.textarea, background: theme.input, color: theme.text, borderColor: theme.border }}
+            />
             <button style={styles.primaryButton} onClick={askPondPal}>Ask PondPal</button>
 
             {answer && <div style={{ ...styles.answer, background: theme.soft }}>{answer}</div>}
@@ -1052,6 +1135,30 @@ export default function App() {
             </div>
           </Panel>
         )}
+
+        <div
+          style={{
+            ...styles.donationBox,
+            background: theme.card,
+            borderColor: theme.border,
+          }}
+        >
+          <div>
+            <h3 style={{ margin: 0 }}>Support PondPal</h3>
+            <p style={{ color: theme.muted, fontWeight: 800, marginBottom: 0 }}>
+              Donations help cover hosting, map tools, and AI fish ID costs.
+            </p>
+          </div>
+
+          <a
+            href="YOUR_DONATION_LINK_HERE"
+            target="_blank"
+            rel="noreferrer"
+            style={styles.donationButton}
+          >
+            Donate
+          </a>
+        </div>
       </main>
     </div>
   );
@@ -1224,7 +1331,9 @@ function LeaderboardTable({ rows, theme }) {
         <tbody>
           {rows.map((fish, index) => (
             <tr key={fish.id} style={{ borderTop: `1px solid ${theme.border}` }}>
-              <td style={styles.td}>{index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : `#${index + 1}`}</td>
+              <td style={styles.td}>
+                {index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : `#${index + 1}`}
+              </td>
               <td style={styles.td}>{fish.species}</td>
               <td style={styles.td}>{fish.weight ? `${fish.weight} lb` : "-"}</td>
               <td style={styles.td}>{fish.length ? `${fish.length} in` : "-"}</td>
@@ -1321,13 +1430,56 @@ const styles = {
   label: { display: "block", marginTop: "18px", marginBottom: "8px", fontWeight: "900" },
   input: { width: "100%", padding: "14px", borderRadius: "16px", border: "1px solid", fontSize: "16px", boxSizing: "border-box" },
   resultBox: { marginTop: "22px", borderRadius: "22px", padding: "20px" },
-  aiResultBox: { border: "1px solid", borderRadius: "22px", padding: "18px", marginBottom: "22px" },
   check: { fontSize: "17px", fontWeight: "700" },
   textarea: { width: "100%", minHeight: "150px", padding: "16px", borderRadius: "18px", border: "1px solid", fontSize: "16px", marginBottom: "16px", boxSizing: "border-box" },
   answer: { marginTop: "20px", padding: "20px", borderRadius: "20px", fontWeight: "800", lineHeight: 1.6 },
   catchForm: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: "12px", marginBottom: "24px" },
   noteList: { display: "grid", gap: "12px", marginTop: "18px" },
   noteCard: { border: "1px solid", borderRadius: "20px", padding: "18px", display: "flex", justifyContent: "space-between", gap: "16px", alignItems: "flex-start" },
+
+  compactAiResult: {
+    border: "1px solid",
+    borderRadius: "18px",
+    padding: "12px 14px",
+    marginBottom: "18px",
+    display: "grid",
+    gridTemplateColumns: "1fr auto",
+    gap: "8px 12px",
+    alignItems: "center",
+    fontSize: "14px",
+  },
+
+  aiPill: {
+    background: "#0f766e",
+    color: "white",
+    borderRadius: "999px",
+    padding: "7px 11px",
+    fontWeight: 900,
+    fontSize: "12px",
+    whiteSpace: "nowrap",
+  },
+
+  donationBox: {
+    border: "1px solid",
+    borderRadius: "24px",
+    padding: "20px",
+    marginTop: "28px",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: "16px",
+    flexWrap: "wrap",
+  },
+
+  donationButton: {
+    background: "#f59e0b",
+    color: "#111827",
+    textDecoration: "none",
+    borderRadius: "999px",
+    padding: "13px 20px",
+    fontWeight: 900,
+    display: "inline-block",
+  },
 
   table: { width: "100%", borderCollapse: "collapse", minWidth: "920px" },
   th: { textAlign: "left", padding: "14px", color: "#0f766e" },
