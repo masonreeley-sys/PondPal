@@ -851,7 +851,33 @@ export default function App() {
               <input placeholder="Weight lbs" value={newCatch.weight} onChange={(e) => setNewCatch({ ...newCatch, weight: e.target.value })} style={{ ...styles.input, background: theme.input, color: theme.text, borderColor: theme.border }} />
               <input placeholder="Location" value={newCatch.location} onChange={(e) => setNewCatch({ ...newCatch, location: e.target.value })} style={{ ...styles.input, background: theme.input, color: theme.text, borderColor: theme.border }} />
               <input type="date" value={newCatch.caught_at} onChange={(e) => setNewCatch({ ...newCatch, caught_at: e.target.value })} style={{ ...styles.input, background: theme.input, color: theme.text, borderColor: theme.border }} />
-              <input type="file" accept="image/*" onChange={(e) => setNewCatch({ ...newCatch, photoFile: e.target.files[0], photo_url: "" })} style={{ ...styles.input, background: theme.input, color: theme.text, borderColor: theme.border }} />
+
+              <input
+                type="file"
+                accept="image/jpeg,image/jpg,image/png,image/webp"
+                onChange={(e) => {
+                  const file = e.target.files[0];
+
+                  if (!file) return;
+
+                  const name = file.name.toLowerCase();
+                  const isHeic = name.endsWith(".heic") || name.endsWith(".heif");
+
+                  if (isHeic) {
+                    alert("iPhone HEIC photos do not display well on the web. Please upload a JPG, JPEG, PNG, or WEBP photo.");
+                    e.target.value = "";
+                    return;
+                  }
+
+                  setNewCatch({
+                    ...newCatch,
+                    photoFile: file,
+                    photo_url: "",
+                  });
+                }}
+                style={{ ...styles.input, background: theme.input, color: theme.text, borderColor: theme.border }}
+              />
+
               <button type="button" style={styles.secondaryButton} onClick={identifyFish} disabled={identifyingFish}>
                 {identifyingFish ? "Identifying..." : "Identify Fish"}
               </button>
@@ -1112,14 +1138,22 @@ function RecordTable({ rows, theme, deleteCatch, showAction = false }) {
             <tr key={fish.id} style={{ borderTop: `1px solid ${theme.border}` }}>
               <td style={styles.td}>
                 {fish.photo_url ? (
-                  <img
-                    src={fish.photo_url}
-                    alt={fish.species}
-                    style={styles.catchPhoto}
-                    onError={(e) => {
-                      e.currentTarget.src = "https://placehold.co/100x100/0f172a/ffffff?text=Fish";
-                    }}
-                  />
+                  <a
+                    href={fish.photo_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    title="Open full-size fish photo"
+                  >
+                    <img
+                      src={fish.photo_url}
+                      alt={fish.species}
+                      style={styles.catchPhoto}
+                      onError={(e) => {
+                        e.currentTarget.src =
+                          "https://placehold.co/100x100/0f172a/ffffff?text=Fish";
+                      }}
+                    />
+                  </a>
                 ) : (
                   "-"
                 )}
@@ -1288,7 +1322,14 @@ const styles = {
   th: { textAlign: "left", padding: "14px", color: "#0f766e" },
   td: { padding: "14px", fontWeight: "700" },
   deleteButton: { background: "#ef4444", color: "white", border: "none", borderRadius: "999px", padding: "9px 14px", fontWeight: "900", cursor: "pointer" },
-  catchPhoto: { width: "90px", height: "90px", objectFit: "cover", borderRadius: "14px" },
+  catchPhoto: {
+    width: "90px",
+    height: "90px",
+    objectFit: "cover",
+    borderRadius: "14px",
+    cursor: "pointer",
+    transition: "transform 0.15s ease",
+  },
 
   mapControls: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px", marginBottom: "16px" },
   realMapBox: { height: "min(70vh, 560px)", minHeight: "420px", borderRadius: "24px", overflow: "hidden", border: "1px solid #dbeafe" },
