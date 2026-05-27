@@ -13,6 +13,7 @@ export default function App() {
   const [authError, setAuthError] = useState("");
   const [tab, setTab] = useState("dashboard");
   const [darkMode, setDarkMode] = useState(() => JSON.parse(localStorage.getItem("pondpal-dark") || "false"));
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   const [ponds, setPonds] = useState([]);
   const [selectedPondId, setSelectedPondId] = useState("");
@@ -46,6 +47,15 @@ export default function App() {
   const selectedPond = ponds.find((p) => p.id === selectedPondId);
   const pondCatches = catches.filter((fish) => fish.pond_id === selectedPondId);
   const pondNotes = notes.filter((item) => item.pond_id === selectedPondId);
+
+  useEffect(() => {
+    function handleResize() {
+      setIsMobile(window.innerWidth < 768);
+    }
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
@@ -389,8 +399,26 @@ export default function App() {
   }
 
   return (
-    <div style={{ ...styles.app, background: theme.page, color: theme.text }}>
-      <aside style={{ ...styles.sidebar, background: theme.sidebar, borderColor: theme.border }}>
+    <div
+      style={{
+        ...styles.app,
+        flexDirection: isMobile ? "column" : "row",
+        background: theme.page,
+        color: theme.text,
+      }}
+    >
+      <aside
+        style={{
+          ...styles.sidebar,
+          width: isMobile ? "100%" : "285px",
+          height: isMobile ? "auto" : "100vh",
+          position: isMobile ? "relative" : "sticky",
+          borderRight: isMobile ? "none" : "1px solid",
+          borderBottom: isMobile ? `1px solid ${theme.border}` : "none",
+          background: theme.sidebar,
+          borderColor: theme.border,
+        }}
+      >
         <div>
           <h1 style={styles.logo}>🐟 PondPal</h1>
           <p style={{ ...styles.sidebarSub, color: theme.muted }}>{user.email}</p>
@@ -399,7 +427,14 @@ export default function App() {
             {ponds.map((pond) => <option key={pond.id} value={pond.id}>{pond.name}</option>)}
           </select>
 
-          <nav style={styles.sideNav}>
+          <nav
+            style={{
+              ...styles.sideNav,
+              display: isMobile ? "flex" : "grid",
+              overflowX: isMobile ? "auto" : "visible",
+              paddingBottom: isMobile ? "8px" : 0,
+            }}
+          >
             <SideButton label="Dashboard" icon="📊" active={tab === "dashboard"} onClick={() => setTab("dashboard")} theme={theme} />
             <SideButton label="Stocking Planner" icon="🐟" active={tab === "planner"} onClick={() => setTab("planner")} theme={theme} />
             <SideButton label="Checklist" icon="✅" active={tab === "checklist"} onClick={() => setTab("checklist")} theme={theme} />
@@ -413,7 +448,7 @@ export default function App() {
           </nav>
         </div>
 
-        <div style={{ display: "grid", gap: "10px" }}>
+        <div style={{ display: "grid", gap: "10px", marginTop: isMobile ? "14px" : 0 }}>
           <button style={{ ...styles.modeButton, background: theme.card, color: theme.text, borderColor: theme.border }} onClick={() => setDarkMode(!darkMode)}>
             {darkMode ? "☀️ Light Mode" : "🌙 Dark Mode"}
           </button>
@@ -421,7 +456,7 @@ export default function App() {
         </div>
       </aside>
 
-      <main style={styles.main}>
+      <main style={{ ...styles.main, padding: isMobile ? "16px" : "28px" }}>
         <header style={styles.topbar}>
           <div>
             <h2 style={styles.pageTitle}>{getTitle(tab)}</h2>
@@ -750,23 +785,23 @@ const styles = {
   linkButton: { border: "none", background: "transparent", color: "#0f766e", fontWeight: 900, cursor: "pointer", marginTop: "16px" },
 
   app: { minHeight: "100vh", display: "flex", fontFamily: "Arial, sans-serif" },
-  sidebar: { width: "285px", padding: "24px", borderRight: "1px solid", display: "flex", flexDirection: "column", justifyContent: "space-between", position: "sticky", top: 0, height: "100vh", boxSizing: "border-box", overflowY: "auto" },
+  sidebar: { width: "285px", padding: "20px", borderRight: "1px solid", display: "flex", flexDirection: "column", justifyContent: "space-between", position: "sticky", top: 0, height: "100vh", boxSizing: "border-box", overflowY: "auto" },
   logo: { fontSize: "30px", margin: 0 },
-  sidebarSub: { marginTop: "6px", fontWeight: 700 },
+  sidebarSub: { marginTop: "6px", fontWeight: 700, fontSize: "13px", wordBreak: "break-word" },
   pondSelect: { width: "100%", marginTop: "14px", padding: "12px", borderRadius: "16px", border: "1px solid", fontWeight: 800 },
   sideNav: { display: "grid", gap: "10px", marginTop: "24px" },
-  sideButton: { border: "none", borderRadius: "18px", padding: "14px 16px", cursor: "pointer", fontWeight: "800", fontSize: "15px", display: "flex", gap: "12px", alignItems: "center", textAlign: "left" },
+  sideButton: { border: "none", borderRadius: "18px", padding: "14px 16px", cursor: "pointer", fontWeight: "800", fontSize: "15px", display: "flex", gap: "12px", alignItems: "center", textAlign: "left", whiteSpace: "nowrap" },
   modeButton: { border: "1px solid", borderRadius: "999px", padding: "14px", fontWeight: "900", cursor: "pointer" },
   logoutButton: { background: "#ef4444", color: "white", border: "none", borderRadius: "999px", padding: "14px", fontWeight: "900", cursor: "pointer" },
 
-  main: { flex: 1, padding: "28px", maxWidth: "1240px", width: "100%" },
+  main: { flex: 1, padding: "28px", maxWidth: "1240px", width: "100%", boxSizing: "border-box" },
   topbar: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px", gap: "16px", flexWrap: "wrap" },
-  pageTitle: { margin: 0, fontSize: "34px" },
+  pageTitle: { margin: 0, fontSize: "clamp(28px, 7vw, 34px)" },
   subtitle: { marginTop: "6px", fontWeight: 700 },
   primaryButton: { background: "#0f766e", color: "white", border: "none", borderRadius: "999px", padding: "14px 22px", fontWeight: "900", cursor: "pointer" },
 
-  hero: { background: "linear-gradient(135deg, #064e3b, #0891b2)", color: "white", borderRadius: "34px", padding: "36px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "24px", boxShadow: "0 20px 50px rgba(15,118,110,.25)", marginBottom: "22px" },
-  heroTitle: { fontSize: "clamp(34px, 5vw, 46px)", margin: "0 0 14px", lineHeight: 1 },
+  hero: { background: "linear-gradient(135deg, #064e3b, #0891b2)", color: "white", borderRadius: "34px", padding: "clamp(22px, 5vw, 36px)", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "24px", boxShadow: "0 20px 50px rgba(15,118,110,.25)", marginBottom: "22px" },
+  heroTitle: { fontSize: "clamp(34px, 8vw, 46px)", margin: "0 0 14px", lineHeight: 1 },
   heroText: { fontSize: "18px", lineHeight: 1.6, opacity: 0.9 },
   scoreCard: { background: "rgba(255,255,255,.15)", borderRadius: "28px", padding: "24px" },
   scoreLabel: { margin: 0, opacity: 0.8, fontWeight: 700 },
@@ -780,7 +815,7 @@ const styles = {
   cardTitle: { fontWeight: 800 },
   cardValue: { fontSize: "28px", margin: 0 },
 
-  panel: { border: "1px solid", borderRadius: "28px", padding: "30px", boxShadow: "0 12px 30px rgba(15,23,42,.08)" },
+  panel: { border: "1px solid", borderRadius: "28px", padding: "clamp(18px, 5vw, 30px)", boxShadow: "0 12px 30px rgba(15,23,42,.08)" },
   label: { display: "block", marginTop: "18px", marginBottom: "8px", fontWeight: "900" },
   input: { width: "100%", padding: "14px", borderRadius: "16px", border: "1px solid", fontSize: "16px", boxSizing: "border-box" },
   resultBox: { marginTop: "22px", borderRadius: "22px", padding: "20px" },
@@ -797,6 +832,6 @@ const styles = {
   deleteButton: { background: "#ef4444", color: "white", border: "none", borderRadius: "999px", padding: "9px 14px", fontWeight: "900", cursor: "pointer" },
   catchPhoto: { width: "70px", height: "70px", objectFit: "cover", borderRadius: "14px" },
 
-  mapControls: { display: "grid", gridTemplateColumns: "1fr auto", gap: "12px", marginBottom: "16px" },
-  realMapBox: { height: "520px", borderRadius: "30px", overflow: "hidden", border: "1px solid #dbeafe" },
+  mapControls: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px", marginBottom: "16px" },
+  realMapBox: { height: "clamp(360px, 65vh, 520px)", borderRadius: "30px", overflow: "hidden", border: "1px solid #dbeafe" },
 };
