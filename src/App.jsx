@@ -457,7 +457,18 @@ export default function App() {
         body: JSON.stringify({ imageUrl: photoUrl }),
       });
 
-      const result = await response.json();
+      const rawText = await response.text();
+
+      let result;
+
+      try {
+        result = JSON.parse(rawText);
+      } catch {
+        throw new Error(
+          "The fish identifier backend did not return JSON. This usually means the Vercel API route crashed or is not deployed. Response started with: " +
+            rawText.slice(0, 160)
+        );
+      }
 
       if (!response.ok) {
         throw new Error(result.error || "Fish identification failed.");
