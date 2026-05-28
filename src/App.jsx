@@ -4,7 +4,7 @@ import "leaflet/dist/leaflet.css";
 import { supabase } from "./supabase";
 import venmoQr from "./assets/venmo-qr.png";
 
-const LAKE_CHARLESTON = { lat: 39.4666, lng: -88.1458 };
+const DEFAULT_LOCATION = { lat: 39.4666, lng: -88.1458 };
 const MILES_TO_METERS = 1609.34;
 
 const FALLBACK_WATERS = [
@@ -89,6 +89,8 @@ export default function App() {
   const [nearbyWaters, setNearbyWaters] = useState([]);
   const [mapLoading, setMapLoading] = useState(false);
   const [mapError, setMapError] = useState("");
+  const [userLocation, setUserLocation] = useState(DEFAULT_LOCATION);
+  const [locationLabel, setLocationLabel] = useState("Lake Charleston fallback");
 
   const theme = darkMode ? dark : light;
   const user = session?.user;
@@ -129,7 +131,9 @@ export default function App() {
   }, [user]);
 
   useEffect(() => {
-    if (tab === "map") fetchNearbyWaters();
+    if (tab === "map") {
+      getCurrentLocationAndFetch();
+    }
   }, [tab, mapRadius]);
 
   async function normalizeOldPublicLocations(loadedPonds) {
@@ -197,9 +201,45 @@ export default function App() {
     setNotes(noteData || []);
   }
 
-  async function fetchNearbyWaters() {
+  function getCurrentLocationAndFetch() {
+    if (!navigator.geolocation) {
+      setUserLocation(DEFAULT_LOCATION);
+      setLocationLabel("Lake Charleston fallback");
+      setMapError("Location is not supported by this browser. Showing Lake Charleston fallback.");
+      fetchNearbyWaters(DEFAULT_LOCATION);
+      return;
+    }
+
     setMapLoading(true);
     setMapError("");
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const coords = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        };
+
+        setUserLocation(coords);
+        setLocationLabel("your current location");
+        fetchNearbyWaters(coords);
+      },
+      () => {
+        setUserLocation(DEFAULT_LOCATION);
+        setLocationLabel("Lake Charleston fallback");
+        setMapError("Location permission was denied or unavailable. Showing Lake Charleston fallback.");
+        fetchNearbyWaters(DEFAULT_LOCATION);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 60000,
+      }
+    );
+  }
+
+  async function fetchNearbyWaters(center = userLocation) {
+    setMapLoading(true);
 
     try {
       const radiusMeters = Math.round(mapRadius * MILES_TO_METERS);
@@ -207,8 +247,8 @@ export default function App() {
       const query = `
         [out:json][timeout:35];
         (
-          way["natural"="water"]["water"~"lake|pond|reservoir"](around:${radiusMeters},${LAKE_CHARLESTON.lat},${LAKE_CHARLESTON.lng});
-          relation["natural"="water"]["water"~"lake|pond|reservoir"](around:${radiusMeters},${LAKE_CHARLESTON.lat},${LAKE_CHARLESTON.lng});
+          way["natural"="water"]["water"~"lake|pond|reservoir"](around:${radiusMeters},${center.lat},${center.lng});
+          relation["natural"="water"]["water"~"lake|pond|reservoir"](around:${radiusMeters},${center.lat},${center.lng});
         );
         out center tags 100;
       `;
@@ -251,18 +291,20 @@ export default function App() {
         }))
         .filter((item) => item.lat && item.lng);
 
-      const unique = Array.from(new Map(waters.map((w) => [w.name + w.lat + w.lng, w])).values());
+      const unique = Array.from(
+        new Map(waters.map((w) => [w.name + w.lat + w.lng, w])).values()
+      );
 
       if (unique.length === 0) {
-        setNearbyWaters(FALLBACK_WATERS);
-        setMapError("Live lake search found no results, so showing local starter lakes.");
+        setNearbyWaters([]);
+        setMapError("No named lakes, ponds, or reservoirs were found nearby. Try increasing the radius.");
         return;
       }
 
       setNearbyWaters(unique);
     } catch {
-      setNearbyWaters(FALLBACK_WATERS);
-      setMapError("Live lake search failed, so showing local starter lakes instead.");
+      setNearbyWaters([]);
+      setMapError("Live lake search failed. Try refreshing the map or allowing location access.");
     } finally {
       setMapLoading(false);
     }
@@ -393,7 +435,7 @@ export default function App() {
       .insert({
         user_id: user.id,
         name: water.name,
-        location: `${water.type} near Lake Charleston`,
+        location: `${water.type} near ${locationLabel}`,
         is_personal: false,
         xp: 0,
         level: 1,
@@ -696,7 +738,8 @@ export default function App() {
         style={{
           ...styles.sidebar,
           width: isMobile ? "100%" : "285px",
-          minWidth: isMobile ? "100%" : "285px",
+          minWidth: isMobile ? "0" : "285px",
+          maxWidth: "100%",
           height: isMobile ? "auto" : "100vh",
           position: isMobile ? "relative" : "sticky",
           borderRight: isMobile ? "none" : "1px solid",
@@ -867,9 +910,7 @@ export default function App() {
             <div style={{ ...styles.resultBox, background: theme.soft }}>
               <h3>Recommended Starter Plan</h3>
               {plan.map((item) => (
-                <p key={item} style={styles.check}>
-                  ✅ {item}
-                </p>
+                <p key={item} style={styles.check}>✅ {item}</p>
               ))}
             </div>
           </Panel>
@@ -886,9 +927,7 @@ export default function App() {
               "Wait before adding bass",
               "Track fish sizes after stocking",
             ].map((item) => (
-              <p key={item} style={styles.check}>
-                ✅ {item}
-              </p>
+              <p key={item} style={styles.check}>✅ {item}</p>
             ))}
           </Panel>
         )}
@@ -963,12 +1002,8 @@ export default function App() {
                 </div>
 
                 <details style={{ gridColumn: "1 / -1" }}>
-                  <summary style={{ cursor: "pointer", fontWeight: 800 }}>
-                    Notes
-                  </summary>
-                  <p style={{ marginBottom: 0 }}>
-                    {newCatch.estimate_notes || "No notes."}
-                  </p>
+                  <summary style={{ cursor: "pointer", fontWeight: 800 }}>Notes</summary>
+                  <p style={{ marginBottom: 0 }}>{newCatch.estimate_notes || "No notes."}</p>
                   <p style={{ color: theme.muted, fontWeight: 800 }}>
                     AI can be wrong. Confirm species and size before saving.
                   </p>
@@ -996,7 +1031,7 @@ export default function App() {
 
         {tab === "map" && (
           <Panel theme={theme}>
-            <h2>Waters Within {mapRadius} Miles of Lake Charleston</h2>
+            <h2>Waters Within {mapRadius} Miles of {locationLabel}</h2>
 
             <div style={styles.mapControls}>
               <select
@@ -1009,19 +1044,21 @@ export default function App() {
                 <option value={100}>100 miles</option>
                 <option value={200}>200 miles</option>
               </select>
-              <button style={styles.primaryButton} onClick={fetchNearbyWaters}>Refresh Map</button>
+              <button style={styles.primaryButton} onClick={getCurrentLocationAndFetch}>
+                Use My Location
+              </button>
             </div>
 
             {mapLoading && <p style={{ color: theme.muted, fontWeight: 900 }}>Loading lakes and ponds...</p>}
             {mapError && <p style={styles.error}>{mapError}</p>}
 
             <div style={styles.realMapBox}>
-              <MapContainer center={[LAKE_CHARLESTON.lat, LAKE_CHARLESTON.lng]} zoom={8} style={{ height: "100%", width: "100%" }}>
-                <MapUpdater center={LAKE_CHARLESTON} radius={mapRadius} />
+              <MapContainer center={[userLocation.lat, userLocation.lng]} zoom={8} style={{ height: "100%", width: "100%" }}>
+                <MapUpdater center={userLocation} radius={mapRadius} />
                 <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 
-                <CircleMarker center={[LAKE_CHARLESTON.lat, LAKE_CHARLESTON.lng]} radius={12} pathOptions={{ color: "#ef4444", fillColor: "#ef4444", fillOpacity: 0.9 }}>
-                  <Popup><strong>Lake Charleston Area</strong></Popup>
+                <CircleMarker center={[userLocation.lat, userLocation.lng]} radius={12} pathOptions={{ color: "#ef4444", fillColor: "#ef4444", fillOpacity: 0.9 }}>
+                  <Popup><strong>{locationLabel}</strong></Popup>
                 </CircleMarker>
 
                 {nearbyWaters.map((water) => (
@@ -1239,7 +1276,7 @@ function RecordTable({ rows, theme, deleteCatch, showAction = false }) {
   }
 
   return (
-    <div style={{ overflowX: "auto" }}>
+    <div style={styles.tableWrap}>
       <table style={styles.table}>
         <thead>
           <tr>
@@ -1318,7 +1355,7 @@ function LeaderboardTable({ rows, theme }) {
   }
 
   return (
-    <div style={{ overflowX: "auto" }}>
+    <div style={styles.tableWrap}>
       <table style={styles.table}>
         <thead>
           <tr>
@@ -1373,14 +1410,41 @@ const dark = {
 };
 
 const styles = {
-  authPage: { minHeight: "100vh", display: "grid", placeItems: "center", fontFamily: "Arial, sans-serif", padding: "24px" },
-  authCard: { width: "100%", maxWidth: "430px", background: "white", borderRadius: "30px", padding: "34px", boxShadow: "0 20px 50px rgba(15,23,42,.12)" },
+  authPage: {
+    minHeight: "100vh",
+    display: "grid",
+    placeItems: "center",
+    fontFamily: "Arial, sans-serif",
+    padding: "24px",
+  },
+  authCard: {
+    width: "100%",
+    maxWidth: "430px",
+    background: "white",
+    borderRadius: "30px",
+    padding: "34px",
+    boxShadow: "0 20px 50px rgba(15,23,42,.12)",
+  },
   authLogo: { fontSize: "38px", margin: 0 },
   authForm: { display: "grid", gap: "12px", marginTop: "20px" },
   error: { color: "#ef4444", fontWeight: 800 },
-  linkButton: { border: "none", background: "transparent", color: "#0f766e", fontWeight: 900, cursor: "pointer", marginTop: "16px" },
+  linkButton: {
+    border: "none",
+    background: "transparent",
+    color: "#0f766e",
+    fontWeight: 900,
+    cursor: "pointer",
+    marginTop: "16px",
+  },
 
-  app: { minHeight: "100vh", display: "flex", fontFamily: "Arial, sans-serif" },
+  app: {
+    minHeight: "100vh",
+    width: "100%",
+    display: "flex",
+    fontFamily: "Arial, sans-serif",
+    overflowX: "hidden",
+  },
+
   sidebar: {
     width: "285px",
     minWidth: "285px",
@@ -1395,50 +1459,230 @@ const styles = {
     height: "100vh",
     boxSizing: "border-box",
     overflowY: "auto",
+    overflowX: "hidden",
   },
-  logo: { fontSize: "30px", margin: 0 },
-  sidebarSub: { marginTop: "6px", fontWeight: 700, fontSize: "13px", wordBreak: "break-word" },
-  pondSelect: { width: "100%", marginTop: "14px", padding: "12px", borderRadius: "16px", border: "1px solid", fontWeight: 800 },
-  sideNav: { display: "grid", gap: "10px", marginTop: "24px" },
-  sideButton: { border: "none", borderRadius: "18px", padding: "14px 16px", cursor: "pointer", fontWeight: "800", fontSize: "15px", display: "flex", gap: "12px", alignItems: "center", textAlign: "left", whiteSpace: "nowrap" },
-  modeButton: { border: "1px solid", borderRadius: "999px", padding: "14px", fontWeight: "900", cursor: "pointer" },
-  logoutButton: { background: "#ef4444", color: "white", border: "none", borderRadius: "999px", padding: "14px", fontWeight: "900", cursor: "pointer" },
 
-  main: { flex: 1, padding: "28px", maxWidth: "1240px", width: "100%", boxSizing: "border-box" },
-  topbar: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px", gap: "16px", flexWrap: "wrap" },
+  logo: { fontSize: "30px", margin: 0 },
+  sidebarSub: {
+    marginTop: "6px",
+    fontWeight: 700,
+    fontSize: "13px",
+    wordBreak: "break-word",
+  },
+  pondSelect: {
+    width: "100%",
+    marginTop: "14px",
+    padding: "12px",
+    borderRadius: "16px",
+    border: "1px solid",
+    fontWeight: 800,
+  },
+  sideNav: { display: "grid", gap: "10px", marginTop: "24px" },
+  sideButton: {
+    border: "none",
+    borderRadius: "18px",
+    padding: "14px 16px",
+    cursor: "pointer",
+    fontWeight: "800",
+    fontSize: "15px",
+    display: "flex",
+    gap: "12px",
+    alignItems: "center",
+    textAlign: "left",
+    whiteSpace: "nowrap",
+  },
+  modeButton: {
+    border: "1px solid",
+    borderRadius: "999px",
+    padding: "14px",
+    fontWeight: "900",
+    cursor: "pointer",
+  },
+  logoutButton: {
+    background: "#ef4444",
+    color: "white",
+    border: "none",
+    borderRadius: "999px",
+    padding: "14px",
+    fontWeight: "900",
+    cursor: "pointer",
+  },
+
+  main: {
+    flex: 1,
+    padding: "28px",
+    width: "100%",
+    maxWidth: "none",
+    minWidth: 0,
+    boxSizing: "border-box",
+    overflowX: "hidden",
+  },
+
+  topbar: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "24px",
+    gap: "16px",
+    flexWrap: "wrap",
+  },
   pageTitle: { margin: 0, fontSize: "clamp(28px, 7vw, 34px)" },
   subtitle: { marginTop: "6px", fontWeight: 700 },
-  primaryButton: { background: "#0f766e", color: "white", border: "none", borderRadius: "999px", padding: "14px 22px", fontWeight: "900", cursor: "pointer" },
-  secondaryButton: { background: "#2563eb", color: "white", border: "none", borderRadius: "999px", padding: "14px 22px", fontWeight: "900", cursor: "pointer" },
+  primaryButton: {
+    background: "#0f766e",
+    color: "white",
+    border: "none",
+    borderRadius: "999px",
+    padding: "14px 22px",
+    fontWeight: "900",
+    cursor: "pointer",
+  },
+  secondaryButton: {
+    background: "#2563eb",
+    color: "white",
+    border: "none",
+    borderRadius: "999px",
+    padding: "14px 22px",
+    fontWeight: "900",
+    cursor: "pointer",
+  },
 
-  badge: { display: "inline-block", background: "rgba(255,255,255,.18)", padding: "8px 12px", borderRadius: "999px", fontWeight: 900, margin: "0 0 14px" },
-  hero: { background: "linear-gradient(135deg, #064e3b, #0891b2)", color: "white", borderRadius: "34px", padding: "clamp(22px, 5vw, 36px)", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "24px", boxShadow: "0 20px 50px rgba(15,118,110,.25)", marginBottom: "22px" },
-  heroTitle: { fontSize: "clamp(34px, 8vw, 46px)", margin: "0 0 14px", lineHeight: 1 },
+  badge: {
+    display: "inline-block",
+    background: "rgba(255,255,255,.18)",
+    padding: "8px 12px",
+    borderRadius: "999px",
+    fontWeight: 900,
+    margin: "0 0 14px",
+  },
+  hero: {
+    background: "linear-gradient(135deg, #064e3b, #0891b2)",
+    color: "white",
+    borderRadius: "34px",
+    padding: "clamp(22px, 5vw, 36px)",
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+    gap: "24px",
+    boxShadow: "0 20px 50px rgba(15,118,110,.25)",
+    marginBottom: "22px",
+    maxWidth: "100%",
+    overflow: "hidden",
+  },
+  heroTitle: {
+    fontSize: "clamp(34px, 8vw, 46px)",
+    margin: "0 0 14px",
+    lineHeight: 1,
+  },
   heroText: { fontSize: "18px", lineHeight: 1.6, opacity: 0.9 },
-  scoreCard: { background: "rgba(255,255,255,.15)", borderRadius: "28px", padding: "24px" },
+  scoreCard: {
+    background: "rgba(255,255,255,.15)",
+    borderRadius: "28px",
+    padding: "24px",
+    minWidth: 0,
+  },
   scoreLabel: { margin: 0, opacity: 0.8, fontWeight: 700 },
   score: { fontSize: "64px", margin: "10px 0" },
   scoreText: { fontWeight: 800, lineHeight: 1.4, margin: 0 },
   healthInfoBox: { marginTop: "14px", display: "grid", gap: "8px" },
-  progressBack: { background: "rgba(255,255,255,.25)", height: "12px", borderRadius: "999px", overflow: "hidden" },
+  progressBack: {
+    background: "rgba(255,255,255,.25)",
+    height: "12px",
+    borderRadius: "999px",
+    overflow: "hidden",
+  },
   progressFill: { background: "#bef264", height: "100%" },
 
-  grid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: "18px" },
-  card: { border: "1px solid", borderRadius: "26px", padding: "26px", boxShadow: "0 12px 30px rgba(15,23,42,.08)" },
+  grid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
+    gap: "18px",
+    width: "100%",
+    maxWidth: "100%",
+  },
+  card: {
+    border: "1px solid",
+    borderRadius: "26px",
+    padding: "26px",
+    boxShadow: "0 12px 30px rgba(15,23,42,.08)",
+    minWidth: 0,
+    overflow: "hidden",
+  },
   cardEmoji: { fontSize: "34px" },
   cardTitle: { fontWeight: 800 },
-  cardValue: { fontSize: "28px", margin: 0 },
+  cardValue: { fontSize: "28px", margin: 0, overflowWrap: "anywhere" },
 
-  panel: { border: "1px solid", borderRadius: "28px", padding: "clamp(18px, 5vw, 30px)", boxShadow: "0 12px 30px rgba(15,23,42,.08)" },
-  label: { display: "block", marginTop: "18px", marginBottom: "8px", fontWeight: "900" },
-  input: { width: "100%", padding: "14px", borderRadius: "16px", border: "1px solid", fontSize: "16px", boxSizing: "border-box" },
-  resultBox: { marginTop: "22px", borderRadius: "22px", padding: "20px" },
+  panel: {
+    border: "1px solid",
+    borderRadius: "28px",
+    padding: "clamp(18px, 5vw, 30px)",
+    boxShadow: "0 12px 30px rgba(15,23,42,.08)",
+    width: "100%",
+    maxWidth: "100%",
+    overflow: "hidden",
+    boxSizing: "border-box",
+  },
+  label: {
+    display: "block",
+    marginTop: "18px",
+    marginBottom: "8px",
+    fontWeight: "900",
+  },
+  input: {
+    width: "100%",
+    padding: "14px",
+    borderRadius: "16px",
+    border: "1px solid",
+    fontSize: "16px",
+    boxSizing: "border-box",
+    minWidth: 0,
+  },
+  resultBox: {
+    marginTop: "22px",
+    borderRadius: "22px",
+    padding: "20px",
+    maxWidth: "100%",
+    overflow: "hidden",
+  },
   check: { fontSize: "17px", fontWeight: "700" },
-  textarea: { width: "100%", minHeight: "150px", padding: "16px", borderRadius: "18px", border: "1px solid", fontSize: "16px", marginBottom: "16px", boxSizing: "border-box" },
-  answer: { marginTop: "20px", padding: "20px", borderRadius: "20px", fontWeight: "800", lineHeight: 1.6 },
-  catchForm: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: "12px", marginBottom: "24px" },
+  textarea: {
+    width: "100%",
+    minHeight: "150px",
+    padding: "16px",
+    borderRadius: "18px",
+    border: "1px solid",
+    fontSize: "16px",
+    marginBottom: "16px",
+    boxSizing: "border-box",
+    resize: "vertical",
+  },
+  answer: {
+    marginTop: "20px",
+    padding: "20px",
+    borderRadius: "20px",
+    fontWeight: "800",
+    lineHeight: 1.6,
+    overflowWrap: "anywhere",
+  },
+  catchForm: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
+    gap: "12px",
+    marginBottom: "24px",
+    width: "100%",
+    maxWidth: "100%",
+  },
   noteList: { display: "grid", gap: "12px", marginTop: "18px" },
-  noteCard: { border: "1px solid", borderRadius: "20px", padding: "18px", display: "flex", justifyContent: "space-between", gap: "16px", alignItems: "flex-start" },
+  noteCard: {
+    border: "1px solid",
+    borderRadius: "20px",
+    padding: "18px",
+    display: "flex",
+    justifyContent: "space-between",
+    gap: "16px",
+    alignItems: "flex-start",
+    flexWrap: "wrap",
+    overflowWrap: "anywhere",
+  },
 
   compactAiResult: {
     border: "1px solid",
@@ -1450,6 +1694,8 @@ const styles = {
     gap: "8px 12px",
     alignItems: "center",
     fontSize: "14px",
+    maxWidth: "100%",
+    overflow: "hidden",
   },
 
   aiPill: {
@@ -1472,6 +1718,8 @@ const styles = {
     alignItems: "center",
     gap: "16px",
     flexWrap: "wrap",
+    maxWidth: "100%",
+    overflow: "hidden",
   },
 
   qrWrap: {
@@ -1491,10 +1739,28 @@ const styles = {
     padding: "8px",
   },
 
-  table: { width: "100%", borderCollapse: "collapse", minWidth: "920px" },
+  tableWrap: {
+    width: "100%",
+    maxWidth: "100%",
+    overflowX: "auto",
+    WebkitOverflowScrolling: "touch",
+  },
+  table: {
+    width: "100%",
+    borderCollapse: "collapse",
+    minWidth: "760px",
+  },
   th: { textAlign: "left", padding: "14px", color: "#0f766e" },
   td: { padding: "14px", fontWeight: "700" },
-  deleteButton: { background: "#ef4444", color: "white", border: "none", borderRadius: "999px", padding: "9px 14px", fontWeight: "900", cursor: "pointer" },
+  deleteButton: {
+    background: "#ef4444",
+    color: "white",
+    border: "none",
+    borderRadius: "999px",
+    padding: "9px 14px",
+    fontWeight: "900",
+    cursor: "pointer",
+  },
   catchPhoto: {
     width: "90px",
     height: "90px",
@@ -1504,6 +1770,20 @@ const styles = {
     transition: "transform 0.15s ease",
   },
 
-  mapControls: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px", marginBottom: "16px" },
-  realMapBox: { height: "min(70vh, 560px)", minHeight: "420px", borderRadius: "24px", overflow: "hidden", border: "1px solid #dbeafe" },
+  mapControls: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+    gap: "12px",
+    marginBottom: "16px",
+    width: "100%",
+  },
+  realMapBox: {
+    height: "min(70vh, 560px)",
+    minHeight: "420px",
+    borderRadius: "24px",
+    overflow: "hidden",
+    border: "1px solid #dbeafe",
+    width: "100%",
+    maxWidth: "100%",
+  },
 };
