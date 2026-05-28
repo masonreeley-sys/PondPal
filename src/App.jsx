@@ -1,18 +1,69 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
+import "./App.css";
 import { supabase } from "./supabase";
-import venmoQr from "./assets/venmo-qr.png";
 
 const DEFAULT_LOCATION = { lat: 39.4666, lng: -88.1458 };
 const MILES_TO_METERS = 1609.34;
 
-const FALLBACK_WATERS = [
-  { id: "fallback-lake-charleston", name: "Lake Charleston", type: "lake", lat: 39.4666, lng: -88.1458 },
-  { id: "fallback-lake-mattoon", name: "Lake Mattoon", type: "lake", lat: 39.317, lng: -88.453 },
-  { id: "fallback-walnut-point", name: "Walnut Point Lake", type: "lake", lat: 39.646, lng: -88.057 },
-  { id: "fallback-lake-paradise", name: "Lake Paradise", type: "lake", lat: 39.42, lng: -88.39 },
-  { id: "fallback-mill-creek", name: "Mill Creek Lake", type: "lake", lat: 39.392, lng: -87.666 },
+const SHOP_LINKS = [
+  {
+    title: "Small Pond Aeration Kit",
+    category: "Aeration",
+    tag: "Small backyard ponds",
+    note: "Compare for small decorative or backyard ponds.",
+    url: "https://russellwatergardens.com/products/pa-1000",
+  },
+  {
+    title: "VEVOR 1 Acre Pond Aerator Kit",
+    category: "Aeration",
+    tag: "Budget farm pond",
+    note: "Compare for small farm ponds up to around 1 acre.",
+    url: "https://www.target.com/p/vevor-pond-aerator-550w-power-5-2cfm-for-up-to-1-acre-50-lake-pond-aeration-kit-includes-3-4-hp-compressor-100-weighted-tubing-diffuser/-/A-1002940223",
+  },
+  {
+    title: "AirMax PS10 Pond Aeration System",
+    category: "Aeration",
+    tag: "Premium acre kit",
+    note: "A more serious aeration system to compare for managed ponds.",
+    url: "https://americanaeration.com/products/airmax-ps10-pond-aeration-system-with-100-3-8-weighted-airline-and-1-diffuser-115v",
+  },
+  {
+    title: "Weighted Hose + Diffuser Kit",
+    category: "Aeration Parts",
+    tag: "Hose and diffuser",
+    note: "Useful if you already have a compressor and need diffuser parts.",
+    url: "https://www.target.com/p/vevor-pond-aerator-air-diffuser-3-8-in-self-sinking-aeration-hose-kit-8in-silicone-lake-aeration-diffuser-with-100ft-pond-aerator-hose-kit-blue/-/A-1010732992",
+  },
+  {
+    title: "Pond Water Test Kit",
+    category: "Testing",
+    tag: "Water quality",
+    note: "Look for pH, ammonia, nitrite, nitrate, alkalinity, and hardness tests.",
+    url: "https://www.amazon.com/s?k=pond+water+test+kit",
+  },
+  {
+    title: "Automatic Fish Feeder",
+    category: "Feeding",
+    tag: "Bluegill/catfish feeding",
+    note: "Helpful for managed feeding programs.",
+    url: "https://www.amazon.com/s?k=pond+fish+feeder",
+  },
+  {
+    title: "Artificial Fish Habitat",
+    category: "Habitat",
+    tag: "Fish structure",
+    note: "Adds cover for forage fish and ambush areas for predator fish.",
+    url: "https://www.amazon.com/s?k=pond+fish+habitat+structure",
+  },
+  {
+    title: "Beneficial Pond Bacteria",
+    category: "Water Care",
+    tag: "Maintenance",
+    note: "Can help with muck and organic waste management when used correctly.",
+    url: "https://www.amazon.com/s?k=beneficial+pond+bacteria",
+  },
 ];
 
 const KNOWN_PUBLIC_NAMES = [
@@ -33,6 +84,19 @@ function getXPForNextLevel(xp) {
   return Math.max(0, nextLevelXP - currentXP);
 }
 
+function niceGoal(goal) {
+  const labels = {
+    balanced: "Balanced",
+    bass: "Bass",
+    bluegill: "Bluegill",
+    catfish: "Catfish",
+    forage: "Forage",
+    trophy: "Trophy Bass",
+  };
+
+  return labels[goal] || "Balanced";
+}
+
 function looksLikeKnownPublicLocation(pond) {
   const name = String(pond?.name || "").toLowerCase();
   const location = String(pond?.location || "").toLowerCase();
@@ -41,6 +105,215 @@ function looksLikeKnownPublicLocation(pond) {
     location.includes("near lake charleston") ||
     KNOWN_PUBLIC_NAMES.some((known) => name.includes(known.toLowerCase()))
   );
+}
+
+function getStockingPlan(profile) {
+  const acres = Math.max(0.05, Number(profile.acres) || 0.25);
+  const goal = profile.goal || "balanced";
+  const bluegill = Math.round(acres * (goal === "trophy" ? 700 : 500));
+  const minnows = Math.max(1, Math.round(acres * 8));
+  const bass = Math.round(acres * (goal === "trophy" ? 50 : 75));
+  const catfish = goal === "catfish" ? Math.round(acres * 125) : Math.round(acres * 50);
+
+  const order = [
+    "Start with forage: fathead minnows and bluegill/redear before predator fish.",
+    "Give forage time to spawn before adding bass.",
+    "Add bass only after the forage base is established.",
+    "Add catfish only if you want them and plan to feed or harvest them.",
+  ];
+
+  const warnings = [
+    "Do not add bass too early or they can wipe out your forage base.",
+    "Do not overstock catfish unless you plan to feed and harvest them.",
+    "For muddy, shallow, or oxygen-stressed ponds, fix water quality before stocking heavily.",
+    "Check local hatchery recommendations and local regulations before buying fish.",
+  ];
+
+  if (goal === "forage") {
+    return {
+      bluegill: `${Math.round(acres * 250)} fish`,
+      minnows: `${Math.max(1, Math.round(acres * 12))} lb`,
+      bass: "Wait",
+      catfish: "Optional",
+      actions: [
+        "Build forage first with minnows, bluegill, and habitat.",
+        "Add brush piles, pallets, rock, or artificial habitat.",
+        "Wait before adding predator fish.",
+      ],
+      order,
+      warnings,
+    };
+  }
+
+  if (goal === "catfish") {
+    return {
+      bluegill: `${Math.round(acres * 300)} fish`,
+      minnows: `${minnows} lb`,
+      bass: "Optional",
+      catfish: `${catfish} fish`,
+      actions: [
+        "Plan a feeding station if catfish are a main goal.",
+        "Avoid overstocking without aeration.",
+        "Harvest catfish regularly once they reach eating size.",
+      ],
+      order,
+      warnings,
+    };
+  }
+
+  return {
+    bluegill: `${bluegill} fish`,
+    minnows: `${minnows} lb`,
+    bass: `${bass} fish`,
+    catfish: `${catfish} fish optional`,
+    actions: [
+      "Stock forage before bass.",
+      "Add habitat before or during forage stocking.",
+      "Wait before adding predator fish if the pond is new.",
+    ],
+    order,
+    warnings,
+  };
+}
+
+function getAerationPlan(profile) {
+  const acres = Math.max(0.05, Number(profile.acres) || 0.25);
+  const avgDepth = Math.max(1, Number(profile.averageDepth) || 6);
+  const maxDepth = Math.max(avgDepth, Number(profile.maxDepth) || 10);
+  const powerNearby = profile.powerNearby || "yes";
+
+  let type = "Small diffuser kit";
+  let diffusers = "1 diffuser";
+  let priority = "Medium";
+  let short = "Basic";
+  let power = "Power nearby helps.";
+
+  if (acres >= 0.75) {
+    type = "Bottom diffuser system";
+    diffusers = acres >= 2 ? "2–4 diffusers" : "1–2 diffusers";
+    priority = "High";
+    short = "Needed";
+  }
+
+  if (maxDepth >= 10) {
+    type = "Bottom diffuser aeration";
+    priority = "High";
+    short = "Deep pond";
+  }
+
+  if (avgDepth <= 4) {
+    type = "Shallow pond aeration or surface agitation";
+    diffusers = "1 diffuser or surface unit";
+    priority = "Medium";
+    short = "Shallow";
+  }
+
+  if (powerNearby === "no") {
+    power = "No power nearby. Compare solar or wind options, but size them carefully.";
+  } else if (powerNearby === "maybe") {
+    power = "Confirm power access before buying a compressor system.";
+  }
+
+  return {
+    type,
+    diffusers,
+    priority,
+    short,
+    power,
+    tips: [
+      "Start aeration gradually, especially in older ponds, to avoid turning over bad bottom water too fast.",
+      "Place diffusers in deeper water, not right next to shore.",
+      "Use weighted airline for clean installation.",
+      "Aeration helps oxygen, fish stress, and water circulation, but it does not fix every algae problem by itself.",
+    ],
+    buy: [
+      "Small ponds: compare small aeration kits.",
+      "Farm ponds up to around 1 acre: compare 1-acre diffuser kits.",
+      "Larger ponds: compare multi-diffuser systems.",
+      "Already have a compressor? Compare weighted hose and diffuser kits.",
+    ],
+    actions: [
+      "Measure pond size and depth before buying.",
+      "Decide where the compressor can safely sit.",
+      "Choose weighted airline and diffuser count based on pond size.",
+    ],
+  };
+}
+
+function getWaterQualityPlan(profile) {
+  const algae = profile.algae || "light";
+  const clarity = profile.clarity || "normal";
+  const smell = profile.waterSmell || "normal";
+
+  let priority = "Normal";
+
+  if (algae === "heavy" || smell === "bad" || clarity === "muddy") {
+    priority = "High";
+  } else if (algae === "moderate") {
+    priority = "Medium";
+  }
+
+  const issues = [];
+
+  if (algae === "heavy") issues.push("Heavy algae may point to excess nutrients, low circulation, or too much runoff.");
+  if (clarity === "muddy") issues.push("Muddy water may come from runoff, clay suspension, livestock, carp, or shoreline erosion.");
+  if (smell === "bad") issues.push("Bad smell can point to low oxygen, decay, stagnant water, or muck buildup.");
+  if (issues.length === 0) issues.push("No major water issue flagged from your current profile.");
+
+  return {
+    priority,
+    checks: [
+      "Water clarity",
+      "Algae level",
+      "Fish gasping at surface",
+      "Bad smell",
+      "pH",
+      "Ammonia and nitrite if fish are stressed",
+      "Dissolved oxygen if you have access to a meter",
+    ],
+    issues,
+    actions: [
+      "Log a water note weekly during warm months.",
+      "Test water before major stocking decisions.",
+      "Reduce nutrient runoff when algae is heavy.",
+      "Consider aeration if fish show summer stress.",
+    ],
+  };
+}
+
+function getHabitatPlan(profile) {
+  const acres = Math.max(0.05, Number(profile.acres) || 0.25);
+  const structureCount = Math.max(2, Math.round(acres * 6));
+
+  return {
+    items: [
+      `${structureCount} or more structure spots for this pond size.`,
+      "Brush piles or artificial fish habitat for forage protection.",
+      "Rock or gravel spawning areas for bluegill/redear.",
+      "Shallow cover for minnows and young bluegill.",
+      "Deeper ambush cover for bass if bass are part of the goal.",
+    ],
+    placement: [
+      "Put some cover near shallow spawning areas.",
+      "Put some cover near depth changes if available.",
+      "Avoid placing all structure in one pile.",
+      "Keep swimming, boating, and mowing access in mind.",
+    ],
+    actions: [
+      "Add habitat before heavy predator stocking.",
+      "Create shallow forage cover first.",
+      "Log habitat additions in Pond Notes.",
+    ],
+  };
+}
+
+function inputStyle(theme) {
+  return {
+    ...styles.input,
+    background: theme.input,
+    color: theme.text,
+    borderColor: theme.border,
+  };
 }
 
 export default function App() {
@@ -58,6 +331,10 @@ export default function App() {
   const [ponds, setPonds] = useState([]);
   const [selectedPondId, setSelectedPondId] = useState("");
   const [newPond, setNewPond] = useState({ name: "", location: "" });
+
+  const [pondProfile, setPondProfile] = useState(() =>
+    JSON.parse(localStorage.getItem("pondpal-profile") || "{}")
+  );
 
   const [catches, setCatches] = useState([]);
   const [identifyingFish, setIdentifyingFish] = useState(false);
@@ -77,9 +354,6 @@ export default function App() {
 
   const [notes, setNotes] = useState([]);
   const [note, setNote] = useState("");
-
-  const [pondSize, setPondSize] = useState(0.25);
-  const [goal, setGoal] = useState("balanced");
 
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
@@ -102,6 +376,13 @@ export default function App() {
   const isPersonalPond = selectedPond?.is_personal === true;
   const currentXP = selectedPond?.xp || 0;
   const currentLevel = selectedPond?.level || getLevelFromXP(currentXP);
+
+  const profile = getCurrentProfile();
+  const stockingPlan = getStockingPlan(profile);
+  const aerationPlan = getAerationPlan(profile);
+  const waterPlan = getWaterQualityPlan(profile);
+  const habitatPlan = getHabitatPlan(profile);
+  const pondHealthScore = calculatePondHealthScore();
 
   useEffect(() => {
     function handleResize() {
@@ -127,6 +408,10 @@ export default function App() {
   }, [darkMode]);
 
   useEffect(() => {
+    localStorage.setItem("pondpal-profile", JSON.stringify(pondProfile));
+  }, [pondProfile]);
+
+  useEffect(() => {
     if (user) loadData();
   }, [user]);
 
@@ -135,6 +420,37 @@ export default function App() {
       getCurrentLocationAndFetch();
     }
   }, [tab, mapRadius]);
+
+  function getCurrentProfile() {
+    const pondKey = selectedPondId || "default";
+
+    return {
+      acres: 0.25,
+      averageDepth: 6,
+      maxDepth: 10,
+      goal: "balanced",
+      powerNearby: "yes",
+      clarity: "normal",
+      algae: "light",
+      waterSmell: "normal",
+      feeding: "no",
+      existingFish: "unknown",
+      ...pondProfile[pondKey],
+    };
+  }
+
+  function updateProfile(field, value) {
+    const pondKey = selectedPondId || "default";
+
+    setPondProfile((old) => ({
+      ...old,
+      [pondKey]: {
+        ...getCurrentProfile(),
+        ...old[pondKey],
+        [field]: value,
+      },
+    }));
+  }
 
   async function normalizeOldPublicLocations(loadedPonds) {
     const pondsToFix = loadedPonds.filter((pond) => {
@@ -335,15 +651,17 @@ export default function App() {
     if (selectedPond?.is_personal !== true) return null;
 
     let score = 55;
-    score += Math.min(20, pondCatches.length * 4);
-    score += Math.min(10, pondNotes.length * 2);
+    score += Math.min(15, pondCatches.length * 3);
+    score += Math.min(15, pondNotes.length * 3);
     score += Math.min(10, currentLevel * 2);
-    score += selectedPond.location ? 5 : 0;
+    score += Number(profile.acres) > 0 ? 5 : 0;
+    score += Number(profile.averageDepth) >= 4 ? 5 : -5;
+    score += profile.powerNearby === "yes" ? 5 : 0;
+    score += profile.algae === "heavy" ? -10 : profile.algae === "moderate" ? -5 : 5;
+    score += profile.waterSmell === "bad" ? -10 : 5;
 
-    return Math.min(100, score);
+    return Math.max(0, Math.min(100, score));
   }
-
-  const pondHealthScore = calculatePondHealthScore();
 
   async function handleAuth(e) {
     e.preventDefault();
@@ -621,24 +939,6 @@ export default function App() {
     setNotes(notes.filter((item) => item.id !== id));
   }
 
-  const plan = useMemo(() => {
-    const acres = Number(pondSize) || 0;
-    const fatheads = Math.max(1, Math.round(acres * 8));
-    const bluegill = Math.round(acres * 500);
-    const bass = Math.round(acres * 75);
-    const catfish = Math.round(acres * 75);
-
-    if (goal === "minnows") {
-      return [`${fatheads} lb fathead minnows`, "Add PVC, brush piles, rock, or pallets", "Wait before adding predator fish"];
-    }
-
-    if (goal === "bass") {
-      return [`${bluegill} bluegill/redear mix`, `${fatheads} lb fathead minnows`, `${bass} largemouth bass once forage is ready`];
-    }
-
-    return [`${bluegill} bluegill/redear mix`, `${fatheads} lb fathead minnows`, `${bass} largemouth bass`, `${catfish} channel catfish if wanted`];
-  }, [pondSize, goal]);
-
   const personalRecords = useMemo(() => {
     const records = {};
 
@@ -667,7 +967,7 @@ export default function App() {
   function askPondPal() {
     if (!question.trim()) return;
 
-    const response = `For ${selectedPond?.name || "this pond"}, start with oxygen, water clarity, cover, and forage fish before adding bigger predator fish.`;
+    const response = `For ${selectedPond?.name || "this pond"}, focus on oxygen, water clarity, algae level, habitat, and forage balance first. Stock forage before predators, and consider aeration if you see fish stress, bad smell, heavy algae, or summer oxygen problems.`;
 
     const newMessage = {
       id: crypto.randomUUID(),
@@ -687,7 +987,9 @@ export default function App() {
         <div style={styles.authCard}>
           <h1 style={styles.authLogo}>🐟 PondPal</h1>
           <h2>{authMode === "login" ? "Log in" : "Create account"}</h2>
-          <p style={{ color: "#64748b", fontWeight: 700 }}>Real login powered by Supabase.</p>
+          <p style={{ color: "#64748b", fontWeight: 700 }}>
+            Private pond management, stocking, aeration, water quality, and catch records.
+          </p>
 
           <form onSubmit={handleAuth} style={styles.authForm}>
             {authMode === "create" && (
@@ -777,27 +1079,35 @@ export default function App() {
               }}
             >
               <option value="dashboard">📊 Dashboard</option>
-              <option value="planner">🐟 Stocking Planner</option>
-              <option value="checklist">✅ Checklist</option>
+              <option value="profile">🌊 Pond Profile</option>
+              <option value="stocking">🐟 Stocking Plan</option>
+              <option value="aeration">💨 Aeration</option>
+              <option value="water">💧 Water Quality</option>
+              <option value="habitat">🪵 Habitat</option>
+              <option value="shop">🛒 Supplies</option>
               <option value="catchlog">🎣 Catch Log</option>
               <option value="records">🏆 Records</option>
               <option value="leaderboard">🥇 Leaderboard</option>
-              <option value="map">🗺️ World Map</option>
-              <option value="ponds">🌊 Ponds</option>
-              <option value="notes">📝 Pond Notes</option>
+              <option value="map">🗺️ Nearby Waters</option>
+              <option value="ponds">➕ Ponds</option>
+              <option value="notes">📝 Notes</option>
               <option value="ask">💬 Ask PondPal</option>
             </select>
           ) : (
             <nav style={styles.sideNav}>
               <SideButton label="Dashboard" icon="📊" active={tab === "dashboard"} onClick={() => setTab("dashboard")} theme={theme} />
-              <SideButton label="Stocking Planner" icon="🐟" active={tab === "planner"} onClick={() => setTab("planner")} theme={theme} />
-              <SideButton label="Checklist" icon="✅" active={tab === "checklist"} onClick={() => setTab("checklist")} theme={theme} />
+              <SideButton label="Pond Profile" icon="🌊" active={tab === "profile"} onClick={() => setTab("profile")} theme={theme} />
+              <SideButton label="Stocking Plan" icon="🐟" active={tab === "stocking"} onClick={() => setTab("stocking")} theme={theme} />
+              <SideButton label="Aeration" icon="💨" active={tab === "aeration"} onClick={() => setTab("aeration")} theme={theme} />
+              <SideButton label="Water Quality" icon="💧" active={tab === "water"} onClick={() => setTab("water")} theme={theme} />
+              <SideButton label="Habitat" icon="🪵" active={tab === "habitat"} onClick={() => setTab("habitat")} theme={theme} />
+              <SideButton label="Supplies" icon="🛒" active={tab === "shop"} onClick={() => setTab("shop")} theme={theme} />
               <SideButton label="Catch Log" icon="🎣" active={tab === "catchlog"} onClick={() => setTab("catchlog")} theme={theme} />
               <SideButton label="Records" icon="🏆" active={tab === "records"} onClick={() => setTab("records")} theme={theme} />
               <SideButton label="Leaderboard" icon="🥇" active={tab === "leaderboard"} onClick={() => setTab("leaderboard")} theme={theme} />
-              <SideButton label="World Map" icon="🗺️" active={tab === "map"} onClick={() => setTab("map")} theme={theme} />
-              <SideButton label="Ponds" icon="🌊" active={tab === "ponds"} onClick={() => setTab("ponds")} theme={theme} />
-              <SideButton label="Pond Notes" icon="📝" active={tab === "notes"} onClick={() => setTab("notes")} theme={theme} />
+              <SideButton label="Nearby Waters" icon="🗺️" active={tab === "map"} onClick={() => setTab("map")} theme={theme} />
+              <SideButton label="Ponds" icon="➕" active={tab === "ponds"} onClick={() => setTab("ponds")} theme={theme} />
+              <SideButton label="Notes" icon="📝" active={tab === "notes"} onClick={() => setTab("notes")} theme={theme} />
               <SideButton label="Ask PondPal" icon="💬" active={tab === "ask"} onClick={() => setTab("ask")} theme={theme} />
             </nav>
           )}
@@ -831,25 +1141,24 @@ export default function App() {
           <>
             <section style={styles.hero}>
               <div>
-                <p style={styles.badge}>{isPersonalPond ? "Personal Pond" : "Named Public Location"}</p>
-                <h2 style={styles.heroTitle}>{selectedPond?.name || "Your Pond"} is ready.</h2>
+                <p style={styles.badge}>{isPersonalPond ? "Private Pond Mode" : "Named Public Location"}</p>
+                <h2 style={styles.heroTitle}>Manage your pond like a pond owner.</h2>
                 <p style={styles.heroText}>
-                  Track catches, upload fish photos, gain XP, level up locations, and build better pond records.
+                  Track pond size, stocking, aeration, water quality, habitat, feeding, and catch records.
                 </p>
               </div>
 
               <div style={styles.scoreCard}>
                 {isPersonalPond ? (
                   <>
-                    <p style={styles.scoreLabel}>Pond Health Score</p>
+                    <p style={styles.scoreLabel}>Pond Readiness Score</p>
                     <h3 style={styles.score}>{pondHealthScore}</h3>
                     <div style={styles.progressBack}>
                       <div style={{ ...styles.progressFill, width: `${pondHealthScore}%` }} />
                     </div>
-                    <div style={styles.healthInfoBox}>
-                      <p style={styles.scoreText}>Only personal ponds you create in the Ponds tab get a Pond Health Score.</p>
-                      <p style={styles.scoreText}>Score is based on catches, notes, level, and whether you added a location.</p>
-                    </div>
+                    <p style={styles.scoreText}>
+                      Based on profile, catches, notes, water quality, aeration readiness, and habitat activity.
+                    </p>
                   </>
                 ) : (
                   <>
@@ -858,77 +1167,206 @@ export default function App() {
                     <div style={styles.progressBack}>
                       <div style={{ ...styles.progressFill, width: `${currentXP % 100}%` }} />
                     </div>
-                    <div style={styles.healthInfoBox}>
-                      <p style={styles.scoreText}>Known map locations do not get a Pond Health Score.</p>
-                      <p style={styles.scoreText}>They only use XP and levels from catches and notes.</p>
-                    </div>
+                    <p style={styles.scoreText}>Public locations use XP only. Pond tools are best for private ponds.</p>
                   </>
                 )}
               </div>
             </section>
 
             <section style={styles.grid}>
+              <Card title="Acres" value={`${profile.acres || 0}`} emoji="📐" theme={theme} />
+              <Card title="Avg Depth" value={`${profile.averageDepth || 0} ft`} emoji="📏" theme={theme} />
+              <Card title="Goal" value={niceGoal(profile.goal)} emoji="🎯" theme={theme} />
+              <Card title="Aeration" value={aerationPlan.short} emoji="💨" theme={theme} />
               <Card title="Level" value={`Lv. ${currentLevel}`} emoji="⭐" theme={theme} />
-              <Card title="XP" value={String(currentXP)} emoji="⚡" theme={theme} />
               <Card title="Next Level" value={`${getXPForNextLevel(currentXP)} XP`} emoji="⬆️" theme={theme} />
-              <Card title="Logged Catches" value={String(pondCatches.length)} emoji="🎣" theme={theme} />
-              <Card title="Personal Records" value={String(personalRecords.length)} emoji="🏆" theme={theme} />
-              <Card title="Pond Notes" value={String(pondNotes.length)} emoji="📝" theme={theme} />
             </section>
+
+            <Panel theme={theme}>
+              <h2>Next Best Actions</h2>
+              <ActionList items={[stockingPlan.actions[0], aerationPlan.actions[0], waterPlan.actions[0], habitatPlan.actions[0]]} />
+            </Panel>
           </>
         )}
 
-        {tab === "planner" && (
+        {tab === "profile" && (
           <Panel theme={theme}>
-            <h2>Stocking Planner</h2>
-            {!isPersonalPond && (
-              <p style={{ color: theme.muted, fontWeight: 800 }}>
-                This is a named public location. Stocking plans are mainly for personal ponds.
-              </p>
-            )}
+            <h2>Pond Profile</h2>
+            <p style={{ color: theme.muted, fontWeight: 800 }}>
+              This controls your stocking, aeration, water quality, and habitat recommendations.
+            </p>
 
-            <label style={styles.label}>Pond size in acres</label>
-            <input
-              style={{ ...styles.input, background: theme.input, color: theme.text, borderColor: theme.border }}
-              type="number"
-              step="0.05"
-              value={pondSize}
-              onChange={(e) => setPondSize(e.target.value)}
-            />
+            <div style={styles.formGrid}>
+              <Field label="Pond size in acres">
+                <input style={inputStyle(theme)} type="number" step="0.05" value={profile.acres} onChange={(e) => updateProfile("acres", e.target.value)} />
+              </Field>
 
-            <label style={styles.label}>Main goal</label>
-            <select
-              style={{ ...styles.input, background: theme.input, color: theme.text, borderColor: theme.border }}
-              value={goal}
-              onChange={(e) => setGoal(e.target.value)}
-            >
-              <option value="balanced">Balanced fishing pond</option>
-              <option value="minnows">Build minnows first</option>
-              <option value="bass">Bass fishing</option>
-            </select>
+              <Field label="Average depth in feet">
+                <input style={inputStyle(theme)} type="number" step="1" value={profile.averageDepth} onChange={(e) => updateProfile("averageDepth", e.target.value)} />
+              </Field>
 
-            <div style={{ ...styles.resultBox, background: theme.soft }}>
-              <h3>Recommended Starter Plan</h3>
-              {plan.map((item) => (
-                <p key={item} style={styles.check}>✅ {item}</p>
-              ))}
+              <Field label="Max depth in feet">
+                <input style={inputStyle(theme)} type="number" step="1" value={profile.maxDepth} onChange={(e) => updateProfile("maxDepth", e.target.value)} />
+              </Field>
+
+              <Field label="Main pond goal">
+                <select style={inputStyle(theme)} value={profile.goal} onChange={(e) => updateProfile("goal", e.target.value)}>
+                  <option value="balanced">Balanced fishing pond</option>
+                  <option value="bass">Bass-focused pond</option>
+                  <option value="bluegill">Bluegill pond</option>
+                  <option value="catfish">Catfish pond</option>
+                  <option value="forage">Forage/minnow pond</option>
+                  <option value="trophy">Trophy bass goal</option>
+                </select>
+              </Field>
+
+              <Field label="Power near pond?">
+                <select style={inputStyle(theme)} value={profile.powerNearby} onChange={(e) => updateProfile("powerNearby", e.target.value)}>
+                  <option value="yes">Yes, power is nearby</option>
+                  <option value="no">No power nearby</option>
+                  <option value="maybe">Not sure</option>
+                </select>
+              </Field>
+
+              <Field label="Existing fish">
+                <select style={inputStyle(theme)} value={profile.existingFish} onChange={(e) => updateProfile("existingFish", e.target.value)}>
+                  <option value="unknown">Unknown</option>
+                  <option value="none">No fish yet</option>
+                  <option value="bluegill">Bluegill / sunfish present</option>
+                  <option value="bass">Bass present</option>
+                  <option value="catfish">Catfish present</option>
+                  <option value="mixed">Mixed fish present</option>
+                </select>
+              </Field>
+
+              <Field label="Water clarity">
+                <select style={inputStyle(theme)} value={profile.clarity} onChange={(e) => updateProfile("clarity", e.target.value)}>
+                  <option value="clear">Very clear</option>
+                  <option value="normal">Normal</option>
+                  <option value="muddy">Muddy/cloudy</option>
+                </select>
+              </Field>
+
+              <Field label="Algae level">
+                <select style={inputStyle(theme)} value={profile.algae} onChange={(e) => updateProfile("algae", e.target.value)}>
+                  <option value="light">Light</option>
+                  <option value="moderate">Moderate</option>
+                  <option value="heavy">Heavy</option>
+                </select>
+              </Field>
+
+              <Field label="Water smell">
+                <select style={inputStyle(theme)} value={profile.waterSmell} onChange={(e) => updateProfile("waterSmell", e.target.value)}>
+                  <option value="normal">Normal</option>
+                  <option value="bad">Bad / rotten smell</option>
+                </select>
+              </Field>
+
+              <Field label="Feeding fish?">
+                <select style={inputStyle(theme)} value={profile.feeding} onChange={(e) => updateProfile("feeding", e.target.value)}>
+                  <option value="no">No</option>
+                  <option value="yes">Yes</option>
+                  <option value="planning">Planning to</option>
+                </select>
+              </Field>
             </div>
           </Panel>
         )}
 
-        {tab === "checklist" && (
+        {tab === "stocking" && (
           <Panel theme={theme}>
-            <h2>Pond Startup Checklist</h2>
-            {[
-              "Check water clarity",
-              "Add aeration if oxygen is low",
-              "Add shallow cover for minnows and bluegill",
-              "Stock forage fish first",
-              "Wait before adding bass",
-              "Track fish sizes after stocking",
-            ].map((item) => (
-              <p key={item} style={styles.check}>✅ {item}</p>
-            ))}
+            <h2>Private Pond Stocking Plan</h2>
+            <p style={{ color: theme.muted, fontWeight: 800 }}>
+              Starter planning only. Check local laws and talk to a local hatchery before buying fish.
+            </p>
+
+            <div style={styles.grid}>
+              <Card title="Bluegill / Redear" value={stockingPlan.bluegill} emoji="🐟" theme={theme} />
+              <Card title="Fathead Minnows" value={stockingPlan.minnows} emoji="🐠" theme={theme} />
+              <Card title="Largemouth Bass" value={stockingPlan.bass} emoji="🎣" theme={theme} />
+              <Card title="Channel Catfish" value={stockingPlan.catfish} emoji="🐡" theme={theme} />
+            </div>
+
+            <InfoBox title="Recommended Order" items={stockingPlan.order} theme={theme} />
+            <InfoBox title="Warnings" items={stockingPlan.warnings} theme={theme} />
+            <InfoBox title="Actions" items={stockingPlan.actions} theme={theme} />
+          </Panel>
+        )}
+
+        {tab === "aeration" && (
+          <Panel theme={theme}>
+            <h2>Aeration Recommendation</h2>
+            <p style={{ color: theme.muted, fontWeight: 800 }}>
+              Aeration depends on pond shape, depth, fish load, and power access. Use this as a starting point.
+            </p>
+
+            <section style={styles.grid}>
+              <Card title="System Type" value={aerationPlan.type} emoji="💨" theme={theme} />
+              <Card title="Diffusers" value={aerationPlan.diffusers} emoji="🫧" theme={theme} />
+              <Card title="Priority" value={aerationPlan.priority} emoji="⚠️" theme={theme} />
+              <Card title="Power Note" value={aerationPlan.power} emoji="🔌" theme={theme} />
+            </section>
+
+            <InfoBox title="Aeration Setup Tips" items={aerationPlan.tips} theme={theme} />
+            <InfoBox title="What To Buy / Compare" items={aerationPlan.buy} theme={theme} />
+            <InfoBox title="Actions" items={aerationPlan.actions} theme={theme} />
+          </Panel>
+        )}
+
+        {tab === "water" && (
+          <Panel theme={theme}>
+            <h2>Water Quality</h2>
+
+            <section style={styles.grid}>
+              <Card title="Clarity" value={profile.clarity} emoji="👁️" theme={theme} />
+              <Card title="Algae" value={profile.algae} emoji="🟢" theme={theme} />
+              <Card title="Smell" value={profile.waterSmell} emoji="👃" theme={theme} />
+              <Card title="Testing Priority" value={waterPlan.priority} emoji="🧪" theme={theme} />
+            </section>
+
+            <InfoBox title="What To Check" items={waterPlan.checks} theme={theme} />
+            <InfoBox title="Likely Issues" items={waterPlan.issues} theme={theme} />
+            <InfoBox title="Actions" items={waterPlan.actions} theme={theme} />
+          </Panel>
+        )}
+
+        {tab === "habitat" && (
+          <Panel theme={theme}>
+            <h2>Habitat Plan</h2>
+            <p style={{ color: theme.muted, fontWeight: 800 }}>
+              Good habitat helps forage fish survive and gives predator fish ambush points.
+            </p>
+
+            <InfoBox title="Recommended Habitat" items={habitatPlan.items} theme={theme} />
+            <InfoBox title="Placement Tips" items={habitatPlan.placement} theme={theme} />
+            <InfoBox title="Actions" items={habitatPlan.actions} theme={theme} />
+          </Panel>
+        )}
+
+        {tab === "shop" && (
+          <Panel theme={theme}>
+            <h2>Pond Supplies</h2>
+            <p style={{ color: theme.muted, fontWeight: 800 }}>
+              Starter links for comparing pond supplies. Prices and stock can change, so compare before buying.
+            </p>
+
+            <div style={styles.shopGrid}>
+              {SHOP_LINKS.map((item) => (
+                <a
+                  key={item.title}
+                  href={item.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ ...styles.shopCard, background: theme.soft, borderColor: theme.border, color: theme.text }}
+                >
+                  <p style={styles.shopTag}>{item.category}</p>
+                  <h3>{item.title}</h3>
+                  <p style={{ color: theme.muted, fontWeight: 800 }}>{item.tag}</p>
+                  <p>{item.note}</p>
+                  <strong>Open link →</strong>
+                </a>
+              ))}
+            </div>
           </Panel>
         )}
 
@@ -940,11 +1378,11 @@ export default function App() {
             </p>
 
             <form onSubmit={addCatch} style={styles.catchForm}>
-              <input placeholder="Species" value={newCatch.species} onChange={(e) => setNewCatch({ ...newCatch, species: e.target.value })} style={{ ...styles.input, background: theme.input, color: theme.text, borderColor: theme.border }} />
-              <input placeholder="Length inches" value={newCatch.length} onChange={(e) => setNewCatch({ ...newCatch, length: e.target.value })} style={{ ...styles.input, background: theme.input, color: theme.text, borderColor: theme.border }} />
-              <input placeholder="Weight lbs" value={newCatch.weight} onChange={(e) => setNewCatch({ ...newCatch, weight: e.target.value })} style={{ ...styles.input, background: theme.input, color: theme.text, borderColor: theme.border }} />
-              <input placeholder="Location" value={newCatch.location} onChange={(e) => setNewCatch({ ...newCatch, location: e.target.value })} style={{ ...styles.input, background: theme.input, color: theme.text, borderColor: theme.border }} />
-              <input type="date" value={newCatch.caught_at} onChange={(e) => setNewCatch({ ...newCatch, caught_at: e.target.value })} style={{ ...styles.input, background: theme.input, color: theme.text, borderColor: theme.border }} />
+              <input placeholder="Species" value={newCatch.species} onChange={(e) => setNewCatch({ ...newCatch, species: e.target.value })} style={inputStyle(theme)} />
+              <input placeholder="Length inches" value={newCatch.length} onChange={(e) => setNewCatch({ ...newCatch, length: e.target.value })} style={inputStyle(theme)} />
+              <input placeholder="Weight lbs" value={newCatch.weight} onChange={(e) => setNewCatch({ ...newCatch, weight: e.target.value })} style={inputStyle(theme)} />
+              <input placeholder="Location" value={newCatch.location} onChange={(e) => setNewCatch({ ...newCatch, location: e.target.value })} style={inputStyle(theme)} />
+              <input type="date" value={newCatch.caught_at} onChange={(e) => setNewCatch({ ...newCatch, caught_at: e.target.value })} style={inputStyle(theme)} />
 
               <input
                 type="file"
@@ -969,7 +1407,7 @@ export default function App() {
                     photo_url: "",
                   });
                 }}
-                style={{ ...styles.input, background: theme.input, color: theme.text, borderColor: theme.border }}
+                style={inputStyle(theme)}
               />
 
               <button type="button" style={styles.secondaryButton} onClick={identifyFish} disabled={identifyingFish}>
@@ -979,34 +1417,20 @@ export default function App() {
             </form>
 
             {(newCatch.ai_species || newCatch.estimate_notes) && (
-              <div
-                style={{
-                  ...styles.compactAiResult,
-                  background: theme.soft,
-                  borderColor: theme.border,
-                  color: theme.text,
-                }}
-              >
+              <div style={{ ...styles.compactAiResult, background: theme.soft, borderColor: theme.border, color: theme.text }}>
                 <div>
-                  <strong>AI Fish ID:</strong>{" "}
-                  {newCatch.ai_species || "Unknown"}{" "}
-                  <span style={{ color: theme.muted }}>
-                    ({newCatch.ai_confidence ?? 0}%)
-                  </span>
+                  <strong>AI Fish ID:</strong> {newCatch.ai_species || "Unknown"}{" "}
+                  <span style={{ color: theme.muted }}>({newCatch.ai_confidence ?? 0}%)</span>
                 </div>
 
                 <div style={styles.aiPill}>
-                  {newCatch.estimated_length
-                    ? `${newCatch.estimated_length} in estimate`
-                    : "No size estimate"}
+                  {newCatch.estimated_length ? `${newCatch.estimated_length} in estimate` : "No size estimate"}
                 </div>
 
                 <details style={{ gridColumn: "1 / -1" }}>
                   <summary style={{ cursor: "pointer", fontWeight: 800 }}>Notes</summary>
                   <p style={{ marginBottom: 0 }}>{newCatch.estimate_notes || "No notes."}</p>
-                  <p style={{ color: theme.muted, fontWeight: 800 }}>
-                    AI can be wrong. Confirm species and size before saving.
-                  </p>
+                  <p style={{ color: theme.muted, fontWeight: 800 }}>AI can be wrong. Confirm species and size before saving.</p>
                 </details>
               </div>
             )}
@@ -1034,11 +1458,7 @@ export default function App() {
             <h2>Waters Within {mapRadius} Miles of {locationLabel}</h2>
 
             <div style={styles.mapControls}>
-              <select
-                style={{ ...styles.input, background: theme.input, color: theme.text, borderColor: theme.border }}
-                value={mapRadius}
-                onChange={(e) => setMapRadius(Number(e.target.value))}
-              >
+              <select style={inputStyle(theme)} value={mapRadius} onChange={(e) => setMapRadius(Number(e.target.value))}>
                 <option value={25}>25 miles</option>
                 <option value={50}>50 miles</option>
                 <option value={100}>100 miles</option>
@@ -1086,8 +1506,8 @@ export default function App() {
             <h2>Manage Ponds</h2>
 
             <form onSubmit={addPond} style={styles.catchForm}>
-              <input placeholder="Pond name" value={newPond.name} onChange={(e) => setNewPond({ ...newPond, name: e.target.value })} style={{ ...styles.input, background: theme.input, color: theme.text, borderColor: theme.border }} />
-              <input placeholder="Location" value={newPond.location} onChange={(e) => setNewPond({ ...newPond, location: e.target.value })} style={{ ...styles.input, background: theme.input, color: theme.text, borderColor: theme.border }} />
+              <input placeholder="Pond name" value={newPond.name} onChange={(e) => setNewPond({ ...newPond, name: e.target.value })} style={inputStyle(theme)} />
+              <input placeholder="Location" value={newPond.location} onChange={(e) => setNewPond({ ...newPond, location: e.target.value })} style={inputStyle(theme)} />
               <button style={styles.primaryButton}>Add Personal Pond</button>
             </form>
 
@@ -1102,8 +1522,8 @@ export default function App() {
                     <h3 style={styles.cardValue}>{pond.name}</h3>
                     <p style={{ color: theme.muted, fontWeight: 800 }}>{pond.location}</p>
                     <p style={{ fontWeight: 900 }}>Lv. {pond.level || 1} • {pond.xp || 0} XP</p>
-                    {personal && <p style={{ color: theme.muted, fontWeight: 800 }}>Gets Pond Health Score</p>}
-                    {!personal && <p style={{ color: theme.muted, fontWeight: 800 }}>No Pond Health Score</p>}
+                    {personal && <p style={{ color: theme.muted, fontWeight: 800 }}>Gets pond-owner tools</p>}
+                    {!personal && <p style={{ color: theme.muted, fontWeight: 800 }}>Public map location</p>}
                     <button style={{ ...styles.deleteButton, marginTop: "16px" }} onClick={() => deletePond(pond.id)}>
                       Delete
                     </button>
@@ -1120,12 +1540,7 @@ export default function App() {
             <p style={{ color: theme.muted, fontWeight: 800 }}>+10 XP for each note saved.</p>
 
             <form onSubmit={addNote}>
-              <textarea
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder="Write a pond note..."
-                style={{ ...styles.textarea, background: theme.input, color: theme.text, borderColor: theme.border }}
-              />
+              <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Write a pond note..." style={{ ...styles.textarea, background: theme.input, color: theme.text, borderColor: theme.border }} />
               <button style={styles.primaryButton}>Save Note</button>
             </form>
 
@@ -1148,12 +1563,7 @@ export default function App() {
         {tab === "ask" && (
           <Panel theme={theme}>
             <h2>Ask PondPal</h2>
-            <textarea
-              value={question}
-              onChange={(e) => setQuestion(e.target.value)}
-              placeholder="Ask a pond question..."
-              style={{ ...styles.textarea, background: theme.input, color: theme.text, borderColor: theme.border }}
-            />
+            <textarea value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="Ask a pond question..." style={{ ...styles.textarea, background: theme.input, color: theme.text, borderColor: theme.border }} />
             <button style={styles.primaryButton} onClick={askPondPal}>Ask PondPal</button>
 
             {answer && <div style={{ ...styles.answer, background: theme.soft }}>{answer}</div>}
@@ -1174,13 +1584,7 @@ export default function App() {
           </Panel>
         )}
 
-        <div
-          style={{
-            ...styles.donationBox,
-            background: theme.card,
-            borderColor: theme.border,
-          }}
-        >
+        <div style={{ ...styles.donationBox, background: theme.card, borderColor: theme.border }}>
           <div>
             <h3 style={{ margin: 0 }}>Support PondPal</h3>
             <p style={{ color: theme.muted, fontWeight: 800, marginBottom: 0 }}>
@@ -1190,9 +1594,12 @@ export default function App() {
 
           <div style={styles.qrWrap}>
             <img
-              src={venmoQr}
+              src="/venmo-qr.png"
               alt="Donate to PondPal with Venmo"
               style={styles.qrCode}
+              onError={(e) => {
+                e.currentTarget.style.display = "none";
+              }}
             />
             <p style={{ margin: 0, fontWeight: 800, color: theme.text }}>
               Scan to support PondPal
@@ -1224,16 +1631,20 @@ function MapUpdater({ center, radius }) {
 function getTitle(tab) {
   return {
     dashboard: "Dashboard",
-    planner: "Stocking Planner",
-    checklist: "Pond Checklist",
+    profile: "Pond Profile",
+    stocking: "Stocking Plan",
+    aeration: "Aeration",
+    water: "Water Quality",
+    habitat: "Habitat",
+    shop: "Pond Supplies",
     catchlog: "Fish Catch Log",
     records: "Records",
     leaderboard: "Leaderboard",
-    map: "World Map",
+    map: "Nearby Waters",
     ponds: "Manage Ponds",
     notes: "Pond Notes",
     ask: "Ask PondPal",
-  }[tab];
+  }[tab] || "Dashboard";
 }
 
 function SideButton({ label, icon, active, onClick, theme }) {
@@ -1270,6 +1681,36 @@ function Panel({ children, theme }) {
   );
 }
 
+function Field({ label, children }) {
+  return (
+    <label style={styles.field}>
+      <span style={styles.label}>{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function ActionList({ items }) {
+  return (
+    <div style={styles.actionList}>
+      {items.map((item) => (
+        <div key={item} style={styles.actionItem}>
+          ✅ {item}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function InfoBox({ title, items, theme }) {
+  return (
+    <div style={{ ...styles.infoBox, background: theme.soft, borderColor: theme.border }}>
+      <h3 style={{ marginTop: 0 }}>{title}</h3>
+      <ActionList items={items} />
+    </div>
+  );
+}
+
 function RecordTable({ rows, theme, deleteCatch, showAction = false }) {
   if (!rows.length) {
     return <p style={{ color: theme.muted, fontWeight: 800 }}>No catches logged yet.</p>;
@@ -1296,19 +1737,13 @@ function RecordTable({ rows, theme, deleteCatch, showAction = false }) {
             <tr key={fish.id} style={{ borderTop: `1px solid ${theme.border}` }}>
               <td style={styles.td}>
                 {fish.photo_url ? (
-                  <a
-                    href={fish.photo_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    title="Open full-size fish photo"
-                  >
+                  <a href={fish.photo_url} target="_blank" rel="noreferrer" title="Open full-size fish photo">
                     <img
                       src={fish.photo_url}
                       alt={fish.species}
                       style={styles.catchPhoto}
                       onError={(e) => {
-                        e.currentTarget.src =
-                          "https://placehold.co/100x100/0f172a/ffffff?text=Fish";
+                        e.currentTarget.src = "https://placehold.co/100x100/0f172a/ffffff?text=Fish";
                       }}
                     />
                   </a>
@@ -1444,7 +1879,6 @@ const styles = {
     fontFamily: "Arial, sans-serif",
     overflowX: "hidden",
   },
-
   sidebar: {
     width: "285px",
     minWidth: "285px",
@@ -1461,7 +1895,6 @@ const styles = {
     overflowY: "auto",
     overflowX: "hidden",
   },
-
   logo: { fontSize: "30px", margin: 0 },
   sidebarSub: {
     marginTop: "6px",
@@ -1517,7 +1950,6 @@ const styles = {
     boxSizing: "border-box",
     overflowX: "hidden",
   },
-
   topbar: {
     display: "flex",
     justifyContent: "space-between",
@@ -1583,7 +2015,6 @@ const styles = {
   scoreLabel: { margin: 0, opacity: 0.8, fontWeight: 700 },
   score: { fontSize: "64px", margin: "10px 0" },
   scoreText: { fontWeight: 800, lineHeight: 1.4, margin: 0 },
-  healthInfoBox: { marginTop: "14px", display: "grid", gap: "8px" },
   progressBack: {
     background: "rgba(255,255,255,.25)",
     height: "12px",
@@ -1598,6 +2029,7 @@ const styles = {
     gap: "18px",
     width: "100%",
     maxWidth: "100%",
+    marginBottom: "18px",
   },
   card: {
     border: "1px solid",
@@ -1620,11 +2052,18 @@ const styles = {
     maxWidth: "100%",
     overflow: "hidden",
     boxSizing: "border-box",
+    marginBottom: "22px",
+  },
+  formGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
+    gap: "14px",
+  },
+  field: {
+    display: "grid",
+    gap: "8px",
   },
   label: {
-    display: "block",
-    marginTop: "18px",
-    marginBottom: "8px",
     fontWeight: "900",
   },
   input: {
@@ -1636,14 +2075,20 @@ const styles = {
     boxSizing: "border-box",
     minWidth: 0,
   },
-  resultBox: {
-    marginTop: "22px",
+  infoBox: {
+    border: "1px solid",
     borderRadius: "22px",
-    padding: "20px",
-    maxWidth: "100%",
-    overflow: "hidden",
+    padding: "18px",
+    marginTop: "18px",
   },
-  check: { fontSize: "17px", fontWeight: "700" },
+  actionList: {
+    display: "grid",
+    gap: "10px",
+  },
+  actionItem: {
+    fontWeight: 800,
+    lineHeight: 1.4,
+  },
   textarea: {
     width: "100%",
     minHeight: "150px",
@@ -1697,7 +2142,6 @@ const styles = {
     maxWidth: "100%",
     overflow: "hidden",
   },
-
   aiPill: {
     background: "#0f766e",
     color: "white",
@@ -1706,6 +2150,29 @@ const styles = {
     fontWeight: 900,
     fontSize: "12px",
     whiteSpace: "nowrap",
+  },
+
+  shopGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))",
+    gap: "16px",
+  },
+  shopCard: {
+    border: "1px solid",
+    borderRadius: "22px",
+    padding: "18px",
+    textDecoration: "none",
+    display: "block",
+  },
+  shopTag: {
+    display: "inline-block",
+    background: "#0f766e",
+    color: "white",
+    borderRadius: "999px",
+    padding: "6px 10px",
+    fontWeight: 900,
+    fontSize: "12px",
+    margin: 0,
   },
 
   donationBox: {
@@ -1721,14 +2188,12 @@ const styles = {
     maxWidth: "100%",
     overflow: "hidden",
   },
-
   qrWrap: {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
     gap: "10px",
   },
-
   qrCode: {
     width: "150px",
     height: "150px",
@@ -1767,7 +2232,6 @@ const styles = {
     objectFit: "cover",
     borderRadius: "14px",
     cursor: "pointer",
-    transition: "transform 0.15s ease",
   },
 
   mapControls: {
