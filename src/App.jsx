@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from "react-leaf
 import "leaflet/dist/leaflet.css";
 import "./App.css";
 import { supabase } from "./supabase";
+import venmoQr from "./assets/venmo-qr.png";
 
 const DEFAULT_LOCATION = { lat: 39.4666, lng: -88.1458 };
 const MILES_TO_METERS = 1609.34;
@@ -455,7 +456,6 @@ export default function App() {
   const [mapError, setMapError] = useState("");
   const [userLocation, setUserLocation] = useState(DEFAULT_LOCATION);
   const [locationLabel, setLocationLabel] = useState("Lake Charleston fallback");
-  const [qrBroken, setQrBroken] = useState(false);
 
   const theme = darkMode ? dark : light;
   const user = session?.user;
@@ -1664,20 +1664,11 @@ export default function App() {
           </div>
 
           <div style={styles.qrWrap}>
-            {!qrBroken ? (
-              <img
-                src="/venmo-qr.png"
-                alt="Donate to PondPal with Venmo"
-                style={styles.qrCode}
-                onError={() => setQrBroken(true)}
-              />
-            ) : (
-              <div style={styles.qrFallback}>
-                QR missing
-                <br />
-                Add <b>venmo-qr.png</b> to the <b>public</b> folder.
-              </div>
-            )}
+            <img
+              src={venmoQr}
+              alt="Donate to PondPal with Venmo"
+              style={styles.qrCode}
+            />
             <p style={{ margin: 0, fontWeight: 800, color: theme.text }}>
               Scan to support PondPal
             </p>
@@ -2317,20 +2308,6 @@ const styles = {
     border: "1px solid #dbeafe",
     background: "white",
     padding: "8px",
-  },
-  qrFallback: {
-    width: "150px",
-    minHeight: "150px",
-    borderRadius: "16px",
-    border: "1px dashed #94a3b8",
-    background: "white",
-    color: "#0f172a",
-    padding: "12px",
-    display: "grid",
-    placeItems: "center",
-    textAlign: "center",
-    fontWeight: 800,
-    fontSize: "12px",
   },
 
   tableWrap: {
