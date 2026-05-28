@@ -7,64 +7,142 @@ import { supabase } from "./supabase";
 const DEFAULT_LOCATION = { lat: 39.4666, lng: -88.1458 };
 const MILES_TO_METERS = 1609.34;
 
-const SHOP_LINKS = [
-  {
-    title: "Small Pond Aeration Kit",
-    category: "Aeration",
-    tag: "Small backyard ponds",
-    note: "Compare for small decorative or backyard ponds.",
-    url: "https://russellwatergardens.com/products/pa-1000",
-  },
-  {
-    title: "VEVOR 1 Acre Pond Aerator Kit",
-    category: "Aeration",
-    tag: "Budget farm pond",
-    note: "Compare for small farm ponds up to around 1 acre.",
-    url: "https://www.target.com/p/vevor-pond-aerator-550w-power-5-2cfm-for-up-to-1-acre-50-lake-pond-aeration-kit-includes-3-4-hp-compressor-100-weighted-tubing-diffuser/-/A-1002940223",
-  },
-  {
-    title: "AirMax PS10 Pond Aeration System",
-    category: "Aeration",
-    tag: "Premium acre kit",
-    note: "A more serious aeration system to compare for managed ponds.",
-    url: "https://americanaeration.com/products/airmax-ps10-pond-aeration-system-with-100-3-8-weighted-airline-and-1-diffuser-115v",
-  },
-  {
-    title: "Weighted Hose + Diffuser Kit",
-    category: "Aeration Parts",
-    tag: "Hose and diffuser",
-    note: "Useful if you already have a compressor and need diffuser parts.",
-    url: "https://www.target.com/p/vevor-pond-aerator-air-diffuser-3-8-in-self-sinking-aeration-hose-kit-8in-silicone-lake-aeration-diffuser-with-100ft-pond-aerator-hose-kit-blue/-/A-1010732992",
-  },
-  {
-    title: "Pond Water Test Kit",
-    category: "Testing",
-    tag: "Water quality",
-    note: "Look for pH, ammonia, nitrite, nitrate, alkalinity, and hardness tests.",
-    url: "https://www.amazon.com/s?k=pond+water+test+kit",
-  },
-  {
-    title: "Automatic Fish Feeder",
-    category: "Feeding",
-    tag: "Bluegill/catfish feeding",
-    note: "Helpful for managed feeding programs.",
-    url: "https://www.amazon.com/s?k=pond+fish+feeder",
-  },
-  {
-    title: "Artificial Fish Habitat",
-    category: "Habitat",
-    tag: "Fish structure",
-    note: "Adds cover for forage fish and ambush areas for predator fish.",
-    url: "https://www.amazon.com/s?k=pond+fish+habitat+structure",
-  },
-  {
-    title: "Beneficial Pond Bacteria",
-    category: "Water Care",
-    tag: "Maintenance",
-    note: "Can help with muck and organic waste management when used correctly.",
-    url: "https://www.amazon.com/s?k=beneficial+pond+bacteria",
-  },
-];
+const SUPPLIES = {
+  stocking: [
+    {
+      title: "Jones Lake Management Fish Stocking",
+      tag: "Bass, bluegill, catfish, minnows",
+      note: "Online fish stocking store with largemouth bass, bluegill, redear, channel catfish, and fathead minnows.",
+      url: "https://shop.joneslakemanagement.com/collections/fish-stocking",
+    },
+    {
+      title: "Natural Waterscapes Live Fish",
+      tag: "Ship-to-door stocking fish",
+      note: "Live pond fish options including bass and bluegill with hatchery-direct shipping options.",
+      url: "https://shop.naturalwaterscapes.com/live-fish/",
+    },
+    {
+      title: "Herman Brothers Fisheries",
+      tag: "Midwest / Illinois hatchery",
+      note: "Illinois-based hatchery focused on initial pond stocking and corrective stocking.",
+      url: "https://hbfisheries.com/our-fish-farm/",
+    },
+    {
+      title: "Scoville Fish Hatchery",
+      tag: "Illinois hatchery",
+      note: "Northern Illinois fish hatchery producing sport and game fish.",
+      url: "https://www.scovillefishhatchery.com/",
+    },
+  ],
+
+  aeration: [
+    {
+      title: "Small Pond Aeration Kit",
+      tag: "Small backyard ponds",
+      note: "Compare for small decorative or backyard ponds.",
+      url: "https://russellwatergardens.com/products/pa-1000",
+    },
+    {
+      title: "VEVOR 1 Acre Pond Aerator Kit",
+      tag: "Budget farm pond",
+      note: "Compare for small farm ponds up to around 1 acre.",
+      url: "https://www.target.com/p/vevor-pond-aerator-550w-power-5-2cfm-for-up-to-1-acre-50-lake-pond-aeration-kit-includes-3-4-hp-compressor-100-weighted-tubing-diffuser/-/A-1002940223",
+    },
+    {
+      title: "AirMax PS10 Pond Aeration System",
+      tag: "Premium acre kit",
+      note: "A more serious aeration system to compare for managed ponds.",
+      url: "https://americanaeration.com/products/airmax-ps10-pond-aeration-system-with-100-3-8-weighted-airline-and-1-diffuser-115v",
+    },
+    {
+      title: "Weighted Hose + Diffuser Kit",
+      tag: "Hose and diffuser",
+      note: "Useful if you already have a compressor and need diffuser parts.",
+      url: "https://www.target.com/p/vevor-pond-aerator-air-diffuser-3-8-in-self-sinking-aeration-hose-kit-8in-silicone-lake-aeration-diffuser-with-100ft-pond-aerator-hose-kit-blue/-/A-1010732992",
+    },
+  ],
+
+  water: [
+    {
+      title: "Pond Water Test Kit",
+      tag: "pH / ammonia / nitrite",
+      note: "Use for checking pond water before stocking or when fish seem stressed.",
+      url: "https://www.amazon.com/s?k=pond+water+test+kit",
+    },
+    {
+      title: "Beneficial Pond Bacteria",
+      tag: "Muck / organic waste",
+      note: "Can help support organic waste management when used correctly.",
+      url: "https://www.amazon.com/s?k=beneficial+pond+bacteria",
+    },
+    {
+      title: "Pond Algae Control",
+      tag: "Algae tools",
+      note: "Compare algae-control options carefully before treating a stocked pond.",
+      url: "https://www.amazon.com/s?k=pond+algae+control",
+    },
+    {
+      title: "Pond Muck Remover",
+      tag: "Bottom muck",
+      note: "Compare options for reducing organic sludge and muck buildup.",
+      url: "https://www.amazon.com/s?k=pond+muck+remover",
+    },
+  ],
+
+  habitat: [
+    {
+      title: "Artificial Fish Habitat",
+      tag: "Fish structure",
+      note: "Adds cover for forage fish and ambush areas for predator fish.",
+      url: "https://www.amazon.com/s?k=pond+fish+habitat+structure",
+    },
+    {
+      title: "Fish Attractor / Pond Structure",
+      tag: "Cover",
+      note: "Compare fish attractors for bass, bluegill, and baitfish cover.",
+      url: "https://www.amazon.com/s?k=fish+attractor+pond+structure",
+    },
+    {
+      title: "Pond Gravel",
+      tag: "Spawning areas",
+      note: "Useful for creating spawning beds and shoreline improvement areas.",
+      url: "https://www.amazon.com/s?k=pond+gravel",
+    },
+    {
+      title: "River Rock for Pond",
+      tag: "Rock habitat",
+      note: "Can help with shoreline structure and spawning areas.",
+      url: "https://www.amazon.com/s?k=river+rock+for+pond",
+    },
+  ],
+
+  feeding: [
+    {
+      title: "Automatic Pond Fish Feeder",
+      tag: "Feeding program",
+      note: "Helpful for bluegill, catfish, and managed feeding programs.",
+      url: "https://www.amazon.com/s?k=pond+fish+feeder",
+    },
+    {
+      title: "Floating Fish Food",
+      tag: "General feed",
+      note: "Compare floating fish feeds for pond fish.",
+      url: "https://www.amazon.com/s?k=floating+fish+food+pond",
+    },
+    {
+      title: "Bluegill Fish Food",
+      tag: "Bluegill feed",
+      note: "Useful if growing bluegill is one of your pond goals.",
+      url: "https://www.amazon.com/s?k=bluegill+fish+food",
+    },
+    {
+      title: "Catfish Fish Food",
+      tag: "Catfish feed",
+      note: "Useful for catfish-focused ponds.",
+      url: "https://www.amazon.com/s?k=catfish+fish+food",
+    },
+  ],
+};
 
 const KNOWN_PUBLIC_NAMES = [
   "Lake Charleston",
@@ -110,6 +188,7 @@ function looksLikeKnownPublicLocation(pond) {
 function getStockingPlan(profile) {
   const acres = Math.max(0.05, Number(profile.acres) || 0.25);
   const goal = profile.goal || "balanced";
+
   const bluegill = Math.round(acres * (goal === "trophy" ? 700 : 500));
   const minnows = Math.max(1, Math.round(acres * 8));
   const bass = Math.round(acres * (goal === "trophy" ? 50 : 75));
@@ -125,7 +204,7 @@ function getStockingPlan(profile) {
   const warnings = [
     "Do not add bass too early or they can wipe out your forage base.",
     "Do not overstock catfish unless you plan to feed and harvest them.",
-    "For muddy, shallow, or oxygen-stressed ponds, fix water quality before stocking heavily.",
+    "Fix water quality before stocking heavily if the pond is muddy, shallow, or oxygen-stressed.",
     "Check local hatchery recommendations and local regulations before buying fish.",
   ];
 
@@ -224,7 +303,7 @@ function getAerationPlan(profile) {
       "Start aeration gradually, especially in older ponds, to avoid turning over bad bottom water too fast.",
       "Place diffusers in deeper water, not right next to shore.",
       "Use weighted airline for clean installation.",
-      "Aeration helps oxygen, fish stress, and water circulation, but it does not fix every algae problem by itself.",
+      "Aeration helps oxygen, fish stress, and circulation, but it does not fix every algae problem by itself.",
     ],
     buy: [
       "Small ponds: compare small aeration kits.",
@@ -255,10 +334,21 @@ function getWaterQualityPlan(profile) {
 
   const issues = [];
 
-  if (algae === "heavy") issues.push("Heavy algae may point to excess nutrients, low circulation, or too much runoff.");
-  if (clarity === "muddy") issues.push("Muddy water may come from runoff, clay suspension, livestock, carp, or shoreline erosion.");
-  if (smell === "bad") issues.push("Bad smell can point to low oxygen, decay, stagnant water, or muck buildup.");
-  if (issues.length === 0) issues.push("No major water issue flagged from your current profile.");
+  if (algae === "heavy") {
+    issues.push("Heavy algae may point to excess nutrients, low circulation, or too much runoff.");
+  }
+
+  if (clarity === "muddy") {
+    issues.push("Muddy water may come from runoff, clay suspension, livestock, carp, or shoreline erosion.");
+  }
+
+  if (smell === "bad") {
+    issues.push("Bad smell can point to low oxygen, decay, stagnant water, or muck buildup.");
+  }
+
+  if (issues.length === 0) {
+    issues.push("No major water issue flagged from your current profile.");
+  }
 
   return {
     priority,
@@ -365,6 +455,7 @@ export default function App() {
   const [mapError, setMapError] = useState("");
   const [userLocation, setUserLocation] = useState(DEFAULT_LOCATION);
   const [locationLabel, setLocationLabel] = useState("Lake Charleston fallback");
+  const [qrBroken, setQrBroken] = useState(false);
 
   const theme = darkMode ? dark : light;
   const user = session?.user;
@@ -1084,7 +1175,6 @@ export default function App() {
               <option value="aeration">💨 Aeration</option>
               <option value="water">💧 Water Quality</option>
               <option value="habitat">🪵 Habitat</option>
-              <option value="shop">🛒 Supplies</option>
               <option value="catchlog">🎣 Catch Log</option>
               <option value="records">🏆 Records</option>
               <option value="leaderboard">🥇 Leaderboard</option>
@@ -1101,7 +1191,6 @@ export default function App() {
               <SideButton label="Aeration" icon="💨" active={tab === "aeration"} onClick={() => setTab("aeration")} theme={theme} />
               <SideButton label="Water Quality" icon="💧" active={tab === "water"} onClick={() => setTab("water")} theme={theme} />
               <SideButton label="Habitat" icon="🪵" active={tab === "habitat"} onClick={() => setTab("habitat")} theme={theme} />
-              <SideButton label="Supplies" icon="🛒" active={tab === "shop"} onClick={() => setTab("shop")} theme={theme} />
               <SideButton label="Catch Log" icon="🎣" active={tab === "catchlog"} onClick={() => setTab("catchlog")} theme={theme} />
               <SideButton label="Records" icon="🏆" active={tab === "records"} onClick={() => setTab("records")} theme={theme} />
               <SideButton label="Leaderboard" icon="🥇" active={tab === "leaderboard"} onClick={() => setTab("leaderboard")} theme={theme} />
@@ -1290,6 +1379,9 @@ export default function App() {
             <InfoBox title="Recommended Order" items={stockingPlan.order} theme={theme} />
             <InfoBox title="Warnings" items={stockingPlan.warnings} theme={theme} />
             <InfoBox title="Actions" items={stockingPlan.actions} theme={theme} />
+
+            <SupplyGrid title="Where To Buy Stock Fish" items={SUPPLIES.stocking} theme={theme} />
+            <SupplyGrid title="Feeding Supplies" items={SUPPLIES.feeding} theme={theme} />
           </Panel>
         )}
 
@@ -1310,6 +1402,8 @@ export default function App() {
             <InfoBox title="Aeration Setup Tips" items={aerationPlan.tips} theme={theme} />
             <InfoBox title="What To Buy / Compare" items={aerationPlan.buy} theme={theme} />
             <InfoBox title="Actions" items={aerationPlan.actions} theme={theme} />
+
+            <SupplyGrid title="Aeration Supplies" items={SUPPLIES.aeration} theme={theme} />
           </Panel>
         )}
 
@@ -1327,6 +1421,8 @@ export default function App() {
             <InfoBox title="What To Check" items={waterPlan.checks} theme={theme} />
             <InfoBox title="Likely Issues" items={waterPlan.issues} theme={theme} />
             <InfoBox title="Actions" items={waterPlan.actions} theme={theme} />
+
+            <SupplyGrid title="Water Quality Supplies" items={SUPPLIES.water} theme={theme} />
           </Panel>
         )}
 
@@ -1340,33 +1436,8 @@ export default function App() {
             <InfoBox title="Recommended Habitat" items={habitatPlan.items} theme={theme} />
             <InfoBox title="Placement Tips" items={habitatPlan.placement} theme={theme} />
             <InfoBox title="Actions" items={habitatPlan.actions} theme={theme} />
-          </Panel>
-        )}
 
-        {tab === "shop" && (
-          <Panel theme={theme}>
-            <h2>Pond Supplies</h2>
-            <p style={{ color: theme.muted, fontWeight: 800 }}>
-              Starter links for comparing pond supplies. Prices and stock can change, so compare before buying.
-            </p>
-
-            <div style={styles.shopGrid}>
-              {SHOP_LINKS.map((item) => (
-                <a
-                  key={item.title}
-                  href={item.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{ ...styles.shopCard, background: theme.soft, borderColor: theme.border, color: theme.text }}
-                >
-                  <p style={styles.shopTag}>{item.category}</p>
-                  <h3>{item.title}</h3>
-                  <p style={{ color: theme.muted, fontWeight: 800 }}>{item.tag}</p>
-                  <p>{item.note}</p>
-                  <strong>Open link →</strong>
-                </a>
-              ))}
-            </div>
+            <SupplyGrid title="Habitat Supplies" items={SUPPLIES.habitat} theme={theme} />
           </Panel>
         )}
 
@@ -1593,14 +1664,20 @@ export default function App() {
           </div>
 
           <div style={styles.qrWrap}>
-            <img
-              src="/venmo-qr.png"
-              alt="Donate to PondPal with Venmo"
-              style={styles.qrCode}
-              onError={(e) => {
-                e.currentTarget.style.display = "none";
-              }}
-            />
+            {!qrBroken ? (
+              <img
+                src="/venmo-qr.png"
+                alt="Donate to PondPal with Venmo"
+                style={styles.qrCode}
+                onError={() => setQrBroken(true)}
+              />
+            ) : (
+              <div style={styles.qrFallback}>
+                QR missing
+                <br />
+                Add <b>venmo-qr.png</b> to the <b>public</b> folder.
+              </div>
+            )}
             <p style={{ margin: 0, fontWeight: 800, color: theme.text }}>
               Scan to support PondPal
             </p>
@@ -1636,7 +1713,6 @@ function getTitle(tab) {
     aeration: "Aeration",
     water: "Water Quality",
     habitat: "Habitat",
-    shop: "Pond Supplies",
     catchlog: "Fish Catch Log",
     records: "Records",
     leaderboard: "Leaderboard",
@@ -1707,6 +1783,39 @@ function InfoBox({ title, items, theme }) {
     <div style={{ ...styles.infoBox, background: theme.soft, borderColor: theme.border }}>
       <h3 style={{ marginTop: 0 }}>{title}</h3>
       <ActionList items={items} />
+    </div>
+  );
+}
+
+function SupplyGrid({ title, items, theme }) {
+  return (
+    <div style={{ ...styles.suppliesSection, borderColor: theme.border }}>
+      <h3 style={{ marginTop: 0 }}>{title}</h3>
+      <p style={{ color: theme.muted, fontWeight: 800 }}>
+        Starter links for comparing supplies. Prices and stock can change, so compare before buying.
+      </p>
+
+      <div style={styles.shopGrid}>
+        {items.map((item) => (
+          <a
+            key={item.title}
+            href={item.url}
+            target="_blank"
+            rel="noreferrer"
+            style={{
+              ...styles.shopCard,
+              background: theme.soft,
+              borderColor: theme.border,
+              color: theme.text,
+            }}
+          >
+            <p style={styles.shopTag}>{item.tag}</p>
+            <h3>{item.title}</h3>
+            <p style={{ color: theme.muted, fontWeight: 800 }}>{item.note}</p>
+            <strong>Open link →</strong>
+          </a>
+        ))}
+      </div>
     </div>
   );
 }
@@ -2152,6 +2261,12 @@ const styles = {
     whiteSpace: "nowrap",
   },
 
+  suppliesSection: {
+    border: "1px solid",
+    borderRadius: "24px",
+    padding: "18px",
+    marginTop: "22px",
+  },
   shopGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))",
@@ -2202,6 +2317,20 @@ const styles = {
     border: "1px solid #dbeafe",
     background: "white",
     padding: "8px",
+  },
+  qrFallback: {
+    width: "150px",
+    minHeight: "150px",
+    borderRadius: "16px",
+    border: "1px dashed #94a3b8",
+    background: "white",
+    color: "#0f172a",
+    padding: "12px",
+    display: "grid",
+    placeItems: "center",
+    textAlign: "center",
+    fontWeight: 800,
+    fontSize: "12px",
   },
 
   tableWrap: {
